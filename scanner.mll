@@ -22,7 +22,8 @@ rule token =
       | "||"                  { OR }
       | '!'                   { NOT }
       | ','                   { COMMA }
-      | ';'                   { COL }
+      | ';'                   { SEMICOL }
+      | ':'                   { COL }
       | '.'                   { POINT }
       | '='                   { ASSIGN }
       | "=="                  { EQUAL }
