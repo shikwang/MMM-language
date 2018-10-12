@@ -2,7 +2,7 @@ type biop = Add | Sub | Mult | Div | Eq | Neq | Less | Leq | Greater | Geq | And
 
 type uniop = Not | Nega
 
-type datatyp = Int | Float | Boolean | Matrix
+type datatyp = Int | Float | Boolean | Matrix | Void
 
 type bind = datatyp * string
 
