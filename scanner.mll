@@ -24,7 +24,7 @@ rule token =
       | ','                   { COMMA }
       | ';'                   { SEMICOL }
       | ':'                   { COL }
-      | '.'                   { POINT }
+      | '.'                   { DOT }
       | '='                   { ASSIGN }
       | "=="                  { EQUAL }
       | "!="                  { NEQUAL }
@@ -38,6 +38,7 @@ rule token =
       | "for"                 { FOR }
       | "while"               { WHILE }
       | "break"               { BREAK }
+      | "return"              { RETURN }
       | "func"                { FUNCTION }
       | "struct"              { STRUCT }
       | "matrix"              { MATRIX }
@@ -49,8 +50,10 @@ rule token =
       | ['0'-'9']+ as lit     { INT_LITERAL(int_of_string lit) }
       | ['0'-'9']+'.'['0'-'9']+ as flt    { FLOAT_LITERAL(float_of_string flt) }
       | '"' ([^ '"']* as str) '"'         { STRING_LITERAL(str) }
-      | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as id      { VARIABLE(id) }
+      | ['a'-'z' 'A'-'Z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as lxm { ID(lxm) }
       | eof                   { EOF }
+      | _ as char { raise (Failure("illegal character " ^ Char.escaped char)) }
+
 and comment = parse
         "*/"                  { token lexbuf }
       | _                     { comment lexbuf }
