@@ -62,7 +62,7 @@ fdecl:
         body = List.rev $7 } }
 
 stdecl:
-  STRUCT ID LBRACE formals_list RBRACE { {stname = $2; stvar = List.rev $4} }
+  STRUCT ID LBRACE struct_list RBRACE { {stname = $2; stvar = List.rev $4} }
 
 formals_opt:
     /* nothing */ { [] }
@@ -71,6 +71,10 @@ formals_opt:
 formal_list:
     typ ID                   { [($1,$2)] }
   | formal_list COMMA typ ID { ($3,$4) :: $1 }
+
+struct_list:
+    typ ID                   { [($1,$2)] }
+  | formal_list SEMICOL typ ID { ($3,$4) :: $1 }
 
 typ:
     INT { Int }
