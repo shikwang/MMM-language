@@ -4,7 +4,8 @@ type uniop = Not | Nega
 
 type datatyp = Int | Float | Boolean | Matrix | String | Void
 
-type bind = datatyp * string
+type bind = Primdecl of datatyp * string
+  | Strudecl of string * string
 
 type expr = 
     Intlit of int
@@ -13,6 +14,7 @@ type expr =
   | Boolit of bool
   | Matrixlit of float array * (int * int)
   | Var of string
+  | Struaccess of string * string
   | Binop of expr * biop * expr
   | Comma of expr list
   | Assign of expr * expr
@@ -34,6 +36,7 @@ type stmt =
   | While of expr * stmt
   | Initial of datatyp * string * expr
   | Defaultmat of string * int * int
+  | IniStrucct of string * string * expr list
 
 type func_decl = {
   mutable ftyp : datatyp;
@@ -42,4 +45,9 @@ type func_decl = {
   body : stmt list;
 }
 
-type program = func_decl list
+type struc_decl = {
+  stname : string;
+  stvar : bind list;
+}
+
+type program =  func_decl list * struc_decl list

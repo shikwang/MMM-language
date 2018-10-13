@@ -47,11 +47,12 @@
 %%
 
 program:
-  decls EOF { List.rev $1 }
+  decls EOF { List.rev (fst $1), List.rev (snd $1) }
 
 decls:
-    /* nothing */ { [] }
-  | decls fdecl { $2 :: $1 }
+    /* nothing */ { [], [] }
+  | decls fdecl { ($2 :: fst $1), snd $1 }
+  | decls stdecl { fst $1, ($2 :: snd $1) }
 
 fdecl:
   FUNCTION ID LPARE formals_opt RPARE LBRACE stmt_list RBRACE
@@ -59,6 +60,9 @@ fdecl:
         fname = $2;
         formals = $4;
         body = List.rev $7 } }
+
+stdecl:
+  STRUCT ID LBRACE formals_list RBRACE { {stname = $2; stvar = List.rev $4} }
 
 formals_opt:
     /* nothing */ { [] }
@@ -73,14 +77,14 @@ typ:
   | FLOAT { Float }
   | BOOLEAN { Boolean }
   | MATRIX { Matrix }
-  | STRING { Strin g}
+  | STRING { String}
 
 stmt_list:
     /* nothing */  { [] }
   | stmt_list stmt { $2 :: $1 }
 
 stmt:
-    expr SEMICOL { Expr($1) }
+    expr_opt SEMICOL { Expr($1) }
   | RETURN expr SEMICOL { Return($2) }
   | LBRACE stmt_list RBRACE { Block(List.rev $2) }
   | IF LPARE expr RPARE stmt %prec NOELSE { If($3, $5, Block([])) } 
@@ -90,7 +94,11 @@ stmt:
   | WHILE LPARE expr RPARE stmt { While($3, $5) }
   | typ ID SEMICOL { Initial($1, $2, Empty) }
   | typ ID ASSIGN expr SEMICOL { Initial($1, $2, $4) }
-  | typ ID LBRACK INT COMMA INT RBRACK { Defaultmat($2, $4, $6) } 
+  | typ ID LBRACK INT_LITERAL COMMA INT_LITERAL RBRACK { Defaultmat($2, $4, $6) } 
+  | STRUCT ID ASSIGN ID LPARE expr_opt RPARE { let inputs = match $6 with
+                                                              Comma(e1) -> e1
+                                                            | Empty -> []
+                                                            | _ -> [$6] in IniStrucct($2, $4, inputs)}
 
 expr_opt:
    /* nothing */ { Empty }
@@ -104,6 +112,7 @@ expr:
   | TRUE { Boollit(true) }
   | FALSE { Boollit(false) }
   | ID { Var($1) }
+  | ID DOT ID  { Struaccess ($1, $3)}
   | expr PLUS expr { Binop($1, Add, $3) }
   | expr MINUS expr { Binop($1, Sub, $3) }
   | expr TIMES expr { Binop($1, Mult, $3) }
