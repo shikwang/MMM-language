@@ -11,14 +11,14 @@
 %token IF ELSE ELIF
 %token FOR WHILE BREAK RETURN
 %token FUNCTION STRUCT MATRIX
-%token INT FLOAT BOOLEAN
+%token INT FLOAT BOOLEAN STRING
 %token TRUE FALSE
 
 %token <int> INT_LITERAL
 %token <float> FLOAT_LITERAL
 %token <string> STRING_LITERAL
 %token <string> ID
-%token GLOBAL EOF
+%token EOF
 
 /* Precedence and associativity of each operator */
 
@@ -47,20 +47,18 @@
 %%
 
 program:
-  decls EOF { $1 }
+  decls EOF { List.rev $1 }
 
 decls:
-    /* nothing */ { [], [] }
-  | decls fdecl {  ($2 :: fst $1), snd $1 }
-  | decls stmt  {  fst $1, ($2 :: snd $1) }
+    /* nothing */ { [] }
+  | decls fdecl { $2 :: $1 }
 
 fdecl:
-  typ ID LPAREN formals_opt RPAREN LBRACE vdecl_list stmt_list RBRACE
-    { { typ = $1;
+  FUNCTION ID LPARE formals_opt RPARE LBRACE stmt_list RBRACE
+    { { ftyp = Void;
         fname = $2;
         formals = $4;
-        locals = List.rev $7;
-        body = List.rev $8 } }
+        body = List.rev $7 } }
 
 formals_opt:
     /* nothing */ { [] }
@@ -74,28 +72,68 @@ typ:
     INT { Int }
   | FLOAT { Float }
   | BOOLEAN { Boolean }
-  | MATRIX {Matrix}
-  | STRING {String}
+  | MATRIX { Matrix }
+  | STRING { Strin g}
 
+stmt_list:
+    /* nothing */  { [] }
+  | stmt_list stmt { $2 :: $1 }
 
+stmt:
+    expr SEMICOL { Expr($1) }
+  | RETURN expr SEMICOL { Return($2) }
+  | LBRACE stmt_list RBRACE { Block(List.rev $2) }
+  | IF LPARE expr RPARE stmt %prec NOELSE { If($3, $5, Block([])) } 
+    /* elseif */
+  | IF LPARE expr RPARE stmt ELSE stmt { If($3, $5, $7) }
+  | FOR LPARE expr SEMICOL expr SEMICOL expr RPARE stmt  { For($3, $5, $7, $9) }
+  | WHILE LPARE expr RPARE stmt { While($3, $5) }
+  | typ ID SEMICOL { Initial($1, $2, Empty) }
+  | typ ID ASSIGN expr SEMICOL { Initial($1, $2, $4) }
+  | MATRIX ID LBRACK INT COMMA INT RBRACK { Defaultmat($2, $4, $6) } 
 
+expr:
+    INT_LITERAL { Intlit($1) }
+  | STRING_LITERAL { Stringlit($1) }
+  | FLOAT_LITERAL { Floatlit($1) }
+  | mat_literal { Matrixlit(fst $1, snd $1) }
+  | TRUE { Boollit(true) }
+  | FALSE { Boollit(false) }
+  | ID { Var($1) }
+  | expr PLUS expr { Binop($1, Add, $3) }
+  | expr MINUS expr { Binop($1, Sub, $3) }
+  | expr TIMES expr { Binop($1, Mult, $3) }
+  | expr DIVIDE expr { Binop($1, Div, $3) }
+  | expr ELETIMES expr { Binop($1, Elemult, $3) }
+  | expr ELEDIVIDE expr { Binop($1, Elediv, $3) }
+  | expr EQUAL expr { Binop($1, Eq, $3) }
+  | expr NEQUAL expr { Binop($1, Neq, $3) }
+  | expr LT expr { Binop($1, Less, $3) }
+  | expr NGT expr { Binop($1, Leq, $3) }
+  | expr GT expr { Binop($1, Greater, $3) }
+  | expr NLT expr { Binop($1, Geq, $3) }
+  | expr AND expr { Binop($1, And, $3) }
+  | expr OR expr { Binop($1, Or, $3) }
+  | MINUS expr %prec NEG { Uop(Nega, $2) }
+  | NOT expr { Uop(Not, $2) }
+  | expr ASSIGN expr { Assign($1, $3) }
+  | ID LBRACK INT_LITERAL RBRACK LBRACK INT_LITERAL RBRACK { Mataccess()}
+  | 
+  | LPARE expr RPARE { $2 }
+  | expr COL { Range(Ind($1), End) }
+  | expr COL expr { Range(Ind($1), Ind($3)) }
+  | COL expr { Range(Beg, Ind($2)) }
+  | COL { Range(Beg, End) }
 
+mat_literal: 
+    LBRACK RBRACK { [| |], (0, 0) }     /* empty matrix */
+  | LBRACK mat_assembly RBRACK { $2 } 
 
+mat_assembly:
+    ele { [| $1 |], (1, 1) }
+  | mat_assembly COMMA ele { Array.append (fst $1) [| $3 |], (fst (snd $1) , snd (snd $1) +1) }
+  | mat_assembly SEMICOL ele { Array.append (fst $1) [| $3 |], (fst (snd $1) +1 , 1) }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+ele:
+    FLOAT_LITERAL { $1 }
+  | MINUS FLOAT_LITERAL %prec NEG { -. $2 }

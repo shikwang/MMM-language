@@ -44,6 +44,7 @@ rule token =
       | "matrix"              { MATRIX }
       | "int"                 { INT }
       | "float"               { FLOAT }
+      | "string"              { STRING }
       | "bool"                { BOOLEAN }
       | "true"                { TRUE }
       | "false"               { FALSE }

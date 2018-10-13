@@ -2,7 +2,7 @@ type biop = Add | Sub | Mult | Div | Eq | Neq | Less | Leq | Greater | Geq | And
 
 type uniop = Not | Nega
 
-type datatyp = Int | Float | Boolean | Matrix | Void
+type datatyp = Int | Float | Boolean | Matrix | String | Void
 
 type bind = datatyp * string
 
@@ -19,6 +19,7 @@ type expr =
   | Uop of uniop * expr
   | Call of string * expr list
   | Mataccess of string * expr * expr
+  | Empty (*declare variable without assigning value*)
   | Bug (* debug entity, not for other use *)
   | Range of index * index
 and index = Beg | End | Ind of expr
@@ -31,6 +32,7 @@ type stmt =
   | For of expr * expr * expr * stmt
   | While of expr * stmt
   | Initial of datatyp * string * expr
+  | Defaultmat of string * int * int
 
 type func_decl = {
   mutable ftyp : datatyp;
