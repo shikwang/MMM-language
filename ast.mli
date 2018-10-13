@@ -18,7 +18,8 @@ type expr =
   | Assign of expr * expr
   | Uop of uniop * expr
   | Call of string * expr list
-  | Mataccess of string * expr * expr
+  | Mataccess of string * int * int
+  | Matslicing of string * expr * expr
   | Empty (*declare variable without assigning value*)
   | Bug (* debug entity, not for other use *)
   | Range of index * index

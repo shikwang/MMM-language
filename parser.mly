@@ -90,7 +90,11 @@ stmt:
   | WHILE LPARE expr RPARE stmt { While($3, $5) }
   | typ ID SEMICOL { Initial($1, $2, Empty) }
   | typ ID ASSIGN expr SEMICOL { Initial($1, $2, $4) }
-  | MATRIX ID LBRACK INT COMMA INT RBRACK { Defaultmat($2, $4, $6) } 
+  | typ ID LBRACK INT COMMA INT RBRACK { Defaultmat($2, $4, $6) } 
+
+expr_opt:
+   /* nothing */ { Empty }
+  | expr { $1 }
 
 expr:
     INT_LITERAL { Intlit($1) }
@@ -104,6 +108,8 @@ expr:
   | expr MINUS expr { Binop($1, Sub, $3) }
   | expr TIMES expr { Binop($1, Mult, $3) }
   | expr DIVIDE expr { Binop($1, Div, $3) }
+  | expr ADDONE   { Binop($1, Add, Intlit(1)) }
+  | expr MINUSONE { Binop($1, Sub, Intlit(1)) }
   | expr ELETIMES expr { Binop($1, Elemult, $3) }
   | expr ELEDIVIDE expr { Binop($1, Elediv, $3) }
   | expr EQUAL expr { Binop($1, Eq, $3) }
@@ -114,11 +120,24 @@ expr:
   | expr NLT expr { Binop($1, Geq, $3) }
   | expr AND expr { Binop($1, And, $3) }
   | expr OR expr { Binop($1, Or, $3) }
+  | expr COMMA expr { match $1, $3 with
+                        Comma(e1), Comma(e2) -> Comma(e1@e2)
+                      | Comma(e1), e2 -> Comma(e1@[e2])
+                      | e1, Comma(e2) -> Comma(e1::e2)
+                      | e1, e2 -> Comma([e1;e2])} 
   | MINUS expr %prec NEG { Uop(Nega, $2) }
   | NOT expr { Uop(Not, $2) }
   | expr ASSIGN expr { Assign($1, $3) }
-  | ID LBRACK INT_LITERAL RBRACK LBRACK INT_LITERAL RBRACK { Mataccess()}
-  | 
+  | ID LBRACK expr RBRACK LBRACK expr RBRACK { match $3, $6 with
+                                                   Range(_,_), Range(_,_) -> Matslicing($1, $3, $6)
+                                                 | Range(_,_), Intlit(_) -> Matslicing($1, $3, Range(Ind($6),Ind($6)))
+                                                 | Intlit(_), Range(_,_) -> Matslicing($1, Range(Ind($3),Ind($3), $6))
+                                                 | Intlit(_), Intlit(_) -> Mataccess($1, $3, $6)
+                                                 | _ -> failwith("wrong indexing expression")}
+  | ID LPARE expr_opt RPARE { let inputs = match $3 with
+                                             Comma(e1) -> e1
+                                           | Empty -> []
+                                           | _ -> [$3] in Call($1, inputs)}
   | LPARE expr RPARE { $2 }
   | expr COL { Range(Ind($1), End) }
   | expr COL expr { Range(Ind($1), Ind($3)) }
