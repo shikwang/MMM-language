@@ -1,1 +1,3 @@
 # MMM-language
+
+“MMM” is a Matlab style matrix manipulation language that can be used to calculate matrix operations efficiently. Users are able to do matrix operations through both in-built and self-defined functions. Same operations can be applied to user defined struct to make code more concise and more efficient. Due to our implementation and optimization of basic matrix operations in Ocaml, the basic matrix operations will be fast. The application of this programming language ranges from image cropping, rotating, denoising, enhancement, edge detection, and color filtering. Users are able to define the struct and functions to process image more efficiently. 
