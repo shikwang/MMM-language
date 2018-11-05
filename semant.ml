@@ -102,8 +102,15 @@ let check(globals, functions)=
 
       (* following are edited by Shenghao *)
       (* Return a semantically-checked statement i.e. containing sexprs *)
-    in
-    
+     in
+
+      let check_bool_expr e = 
+        let (t', e') = expr e
+        and err = "expected Boolean expression in " ^ string_of_expr e
+        in if t' != Bool then raise (Failure err) else (t', e') 
+      in
+
+
     let rec check_stmt = function
         Expr e -> SExpr (expr e)
       | If(p, b1, b2) -> SIf(check_bool_expr p, check_stmt b1, check_stmt b2)
@@ -126,10 +133,9 @@ let check(globals, functions)=
           in SBlock(check_stmt_list sl)
 
     in (* body of check_function *)
-    { styp = func.typ;
+    { styp = func.sftyp;
       sfname = func.fname;
       sformals = func.formals;
-      slocals  = func.locals;
       sbody = match check_stmt (Block func.body) with SBlock(sl) -> sl
       | _ -> raise (Failure ("internal error: block didn't become a block?"))
     }
