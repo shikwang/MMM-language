@@ -55,11 +55,11 @@ decls:
   | decls stdecl { fst $1, ($2 :: snd $1) }
 
 fdecl:
-  FUNCTION ID LPARE formals_opt RPARE LBRACE stmt_list RBRACE
-    { { ftyp = Void;
-        fname = $2;
-        formals = $4;
-        body = List.rev $7 } }
+  FUNCTION typ ID LPARE formals_opt RPARE LBRACE stmt_list RBRACE
+    { { ftyp = $2;
+        fname = $3;
+        formals = $5;
+        body = List.rev $8 } }
 
 stdecl:
   STRUCT ID LBRACE struct_list RBRACE { {stname = $2; stvar = List.rev $4} }
