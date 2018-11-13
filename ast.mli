@@ -23,7 +23,6 @@ type expr =
   | Mataccess of string * expr * expr
   | Matslicing of string * expr * expr
   | Empty (*declare variable without assigning value*)
-  | Bug (* debug entity, not for other use *)
   | Range of index * index
 and index = Beg | End | Ind of expr
 

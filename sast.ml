@@ -2,6 +2,8 @@
 
 open Ast
 
+module StringMap = Map.Make(String)
+
 type sexpr = datatyp * sx
 and sx =
     SIntlit of int
@@ -19,9 +21,8 @@ and sx =
   | SMataccess of string * sexpr * sexpr
   | SMatslicing of string * sexpr * sexpr
   | SEmpty (*declare variable without assigning value*)
-  | SBug (* debug entity, not for other use *)
   | SRange of sindex * sindex
-and sindex = sBeg | sEnd | sInd of sexpr
+and sindex = SBeg | SEnd | SInd of sexpr
 
 type sstmt =
     SBlock of sstmt list
@@ -38,6 +39,7 @@ type sfunc_decl = {
     mutable sftyp : datatyp;
     sfname : string;
     sformals : bind list;
+    slocals : datatyp StringMap.t;
     sbody : sstmt list;
   }
 
