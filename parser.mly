@@ -11,7 +11,7 @@
 %token IF ELSE ELIF
 %token FOR WHILE BREAK RETURN
 %token FUNCTION STRUCT MATRIX
-%token INT FLOAT BOOLEAN STRING
+%token INT FLOAT BOOLEAN STRING VOID
 %token TRUE FALSE
 
 %token <int> INT_LITERAL
@@ -83,7 +83,8 @@ typ:
   | FLOAT { Float }
   | BOOLEAN { Boolean }
   | MATRIX { Matrix }
-  | STRING { String}
+  | STRING { String }
+  | VOID { Void }
 
 stmt_list:
     /* nothing */  { [] }

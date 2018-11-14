@@ -87,7 +87,7 @@ let rec string_of_sstmt = function
 
 let string_of_sstdecl stdecl = "struct " ^ stdecl.sstname ^ " {\n" ^ String.concat ";\n" (List.map string_of_bind stdecl.sstvar) ^ "\n}\n"
 
-let string_of_sfdecl fdecl = "func " ^ fdecl.sfname ^ "(" ^ String.concat ", " (List.map string_of_bind fdecl.sformals) ^
-   ")\n{\n" ^ String.concat "" (List.map string_of_sstmt fdecl.sbody) ^ "}\n"
+let string_of_sfdecl fdecl = "func " ^ string_of_datatyp fdecl.sftyp ^ " " ^fdecl.sfname ^ "(" ^ 
+    String.concat ", " (List.map string_of_bind fdecl.sformals) ^ ")\n{\n" ^ String.concat "" (List.map string_of_sstmt fdecl.sbody) ^ "}\n"
 
 let string_of_sprogram (funcs, structs) = String.concat "\n" (List.map string_of_sstdecl structs) ^ "\n" ^String.concat "\n" (List.map string_of_sfdecl funcs)

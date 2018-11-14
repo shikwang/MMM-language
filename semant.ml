@@ -36,7 +36,6 @@ let check(functions, structures)=
   let report_built_in_duplicate list =
     let rec helper = function
     | [] -> ()
-    | _ :: t -> helper t
     | "print" :: _ -> raise (Failure ("function print may not be defined"))
     | "height" :: _ -> raise (Failure ("function height may not be defined"))
     | "width" :: _ -> raise (Failure ("function width may not be defined"))
@@ -49,6 +48,7 @@ let check(functions, structures)=
     | "cov" :: _ -> raise (Failure ("function cov may not be defined"))
     | "imread" :: _ -> raise (Failure ("function imread may not be defined"))
     | "save" :: _ -> raise (Failure ("function save may not be defined"))
+    | _ :: t -> helper t
     in helper list
   in report_built_in_duplicate (List.map (fun fd -> fd.fname) functions);
 
@@ -172,15 +172,17 @@ let check(functions, structures)=
       | Matrixlit(l,(r,c)) -> if Array.length l = r * c then (Matrix, SMatrixlit(l, (r,c)))
                               else raise ( Failure ("illegal Matrix Dimension"))
       | Var s       -> (type_of_identifier s, SVar s)
-      | Struaccess (vname, member) -> (Int, SStruaccess(vname, member))
-          (*let stname = type_of_struct vname in 
+      | Struaccess (vname, member) -> 
+          let stname = type_of_struct vname in 
           let st = find_str stname in
-          let me = 
-            try List.find member (List.map (fun b -> match b with 
-                                                              Primdecl(_,n) -> n
-                                                            | Strudecl(_,n) -> n) st.stvar)
-                    with Not_found -> raise (Failure ("unrecognized struct member " ^ member))
-          in match me with Primdecl(styp,_) -> *)
+          let mt = 
+            let rec find x lst = match lst with
+                                    [] -> raise (Failure ("unrecognized struct member " ^ x))
+                                  | hd :: tl -> (match hd with 
+                                                    Primdecl(ty, x) -> ty
+                                                  | _ -> find x tl)
+            in find member st.stvar         
+          in (mt, SStruaccess(vname, member))
       | Assign(var, e) as ex -> 
           let (lt, s) = expr var
           and (rt, e') = expr e in
@@ -284,7 +286,7 @@ let check(functions, structures)=
       string_of_datatyp func.ftyp ^ " in " ^ string_of_expr e))
 
     | Initial(t, v, e) -> let (t', e') = expr e in
-      if t' = t then match t with 
+      if t' = t || e = Empty then match t with 
         Matrix | Struct | Void -> raise ( Failure (string_of_datatyp t ^ " cannot be initialed this way!"))
       | _ -> SInitial(t, v, (t', e'))
       else raise ( Failure ("Initial gives " ^ string_of_datatyp t' ^ " expected " ^

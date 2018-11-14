@@ -45,6 +45,7 @@ rule token =
       | "int"                 { INT }
       | "float"               { FLOAT }
       | "string"              { STRING }
+      | "void"                { VOID }
       | "bool"                { BOOLEAN }
       | "true"                { TRUE }
       | "false"               { FALSE }
