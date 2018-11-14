@@ -5,7 +5,7 @@ open Sast
 
    Check each struct, then check each function *)
 
-let check(functions, struct)=
+let check(functions, structures)=
   (* Raise an exception if the given list has a duplicate *)
   let report_duplicate except list =
     let rec helper = function
@@ -28,7 +28,7 @@ let check(functions, struct)=
   in
 
   (**** Checking struct ****)
-  report_duplicate (fun n -> "duplicate struct " ^ n) (List.map (fun st -> st.stname) struct);
+  report_duplicate (fun n -> "duplicate struct " ^ n) (List.map (fun st -> st.stname) structures);
 
   (**** Checking Functions ****)
   let report_built_in_duplicate list =
@@ -48,7 +48,7 @@ let check(functions, struct)=
     | "imread" :: _ -> raise (Failure ("function imread may not be defined"))
     | "save" :: _ -> raise (Failure ("function save may not be defined"))
     in helper list
-  in report_built_in_duplicate (List.map (fun fd -> fd.fname) functions)
+  in report_built_in_duplicate (List.map (fun fd -> fd.fname) functions);
 
   (* Add function declaration for a named function *)
   let built_in_decls =  
@@ -80,7 +80,7 @@ let check(functions, struct)=
 
   let struct_decls = List.fold_left (
     fun m st -> StringMap.add st.stname st m)
-    StringMap.empty struct
+    StringMap.empty structures
   in
 
   let find_str s = 
@@ -119,7 +119,7 @@ let check(functions, struct)=
     (* Build local symbol table of variables for this function *)
     let (symbols,matrixsize,strmap) = 
       let rec build_map sym siz smp = function
-        Expr e ->（sym, siz, smp）
+        Expr e ->(sym, siz, smp)
       | If(p, b1, b2) -> let (sym1,siz1,smp1) = build_map sym siz smp b1 in build_map sym1 siz1 smp1 b2
       | For(e1, e2, e3, st) -> build_map sym siz smp st 
       | While(p, s) -> build_map sym siz smp s
@@ -170,8 +170,10 @@ let check(functions, struct)=
       | Struaccess (vname, member) ->
           let stname = type_of_struct vname in 
           let st = find_str stname in
-          let me = try List.find Primdecl(_, member) st.var
-          with Not_found -> raise (Failure ("unrecognized struct member " ^ member))
+          let me = try List.find member (List.map (fun b -> match b with 
+                                                              Primdecl(_,n) -> n
+                                                            | Strudecl(_,n) -> n) st.stvar)
+                    with Not_found -> raise (Failure ("unrecognized struct member " ^ member))
           in match me with Primdecl(styp,_) -> (styp, SStruaccess(vname, member))
       | Assign(var, e) as ex -> 
           let (lt, s) = expr var
@@ -317,4 +319,4 @@ let check(functions, struct)=
         SBlock(sl) -> sl
         | _ -> raise (Failure ("internal error: block didn't become a block?"))
       }
-  in (List.map check_str struct, List.map check_function functions)
+  in (List.map check_str structures, List.map check_function functions)
