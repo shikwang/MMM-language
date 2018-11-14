@@ -1,4 +1,4 @@
-int main(){
+func int main(){
     int a = 1;
     matrix b[4,5];
     

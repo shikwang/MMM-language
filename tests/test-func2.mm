@@ -6,5 +6,5 @@ func float Foo(){
 
 func void main(){
     float a = Foo();     /* this should success */
-    print("ggg);
+    print("ggg");
 }

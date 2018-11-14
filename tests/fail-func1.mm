@@ -4,5 +4,5 @@ func void print(){
 }
 
 func void main(){
-    print()
+    print();
 }

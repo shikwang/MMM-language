@@ -1,4 +1,4 @@
-int main(){
+func int main(){
     int i = 1;
     float f;
     

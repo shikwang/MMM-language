@@ -287,7 +287,7 @@ let check(functions, structures)=
 
     | Initial(t, v, e) -> let (t', e') = expr e in
       if t' = t || e = Empty then match t with 
-        Matrix | Struct | Void -> raise ( Failure (string_of_datatyp t ^ " cannot be initialed this way!"))
+        Struct | Void -> raise ( Failure (string_of_datatyp t ^ " cannot be initialed this way!"))
       | _ -> SInitial(t, v, (t', e'))
       else raise ( Failure ("Initial gives " ^ string_of_datatyp t' ^ " expected " ^
       string_of_datatyp t ^ " in " ^ string_of_expr e))
