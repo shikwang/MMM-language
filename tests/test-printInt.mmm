@@ -1,0 +1,7 @@
+func int main()
+{
+    print(66666);
+    return 0;    
+
+}
+

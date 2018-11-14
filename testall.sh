@@ -12,7 +12,15 @@ LLI="lli"
 # Path to the LLVM compiler
 LLC="llc"
 
+# Path to the C compiler
+CC="cc"
+
+# Path to the mmm compiler.  Usually "./mmm.native"
+# Try "_build/mmm.native" if ocamlbuild was unable to create a symbolic link.
 MMM="./mmm.native"
+#MMM="_build/mmm.native"
+
+
 
 # Set time limit for all operations
 ulimit -t 30
@@ -25,7 +33,7 @@ globalerror=0
 keep=0
 
 Usage() {
-    echo "Usage: testall.sh [options] [.mm files]"
+    echo "Usage: testall.sh [options] [.mmm files]"
     echo "-k    Keep intermediate files"
     echo "-h    Print this help"
     exit 1
@@ -74,8 +82,8 @@ RunFail() {
 Check() {
     error=0
     basename=`echo $1 | sed 's/.*\\///
-                             s/.mm//'`
-    reffile=`echo $1 | sed 's/.mm$//'`
+                             s/.mmm//'`
+    reffile=`echo $1 | sed 's/.mmm$//'`
     basedir="`echo $1 | sed 's/\/[^\/]*$//'`/."
 
     echo -n "$basename..."
@@ -84,13 +92,12 @@ Check() {
     echo "###### Testing $basename" 1>&2
 
     generatedfiles=""
-
     generatedfiles="$generatedfiles ${basename}.ll ${basename}.s ${basename}.exe ${basename}.out" &&
     Run "$MMM" "$1" ">" "${basename}.ll" &&
     Run "$LLC" "-relocation-model=pic" "${basename}.ll" ">" "${basename}.s" &&
+    Run "$CC" "-o" "${basename}.exe" "${basename}.s"  &&
     Run "./${basename}.exe" > "${basename}.out" &&
     Compare ${basename}.out ${reffile}.out ${basename}.diff
-
     # Report the status and clean up the generated files
 
     if [ $error -eq 0 ] ; then
@@ -108,8 +115,8 @@ Check() {
 CheckFail() {
     error=0
     basename=`echo $1 | sed 's/.*\\///
-                             s/.mm//'`
-    reffile=`echo $1 | sed 's/.mm$//'`
+                             s/.mmm//'`
+    reffile=`echo $1 | sed 's/.mmm$//'`
     basedir="`echo $1 | sed 's/\/[^\/]*$//'`/."
 
     echo -n "$basename..."
@@ -162,7 +169,7 @@ if [ $# -ge 1 ]
 then
     files=$@
 else
-    files="tests/test-*.mm tests/fail-*.mm"
+    files="tests/test-*.mmm tests/fail-*.mmm"
 fi
 
 for file in $files

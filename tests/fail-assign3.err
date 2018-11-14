@@ -1,1 +1,1 @@
-Fatal error: exception Failure("illegal assignment string = int in s = 1")
+Fatal error: exception Failure("illegal assignment string = int in 1")
