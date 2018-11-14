@@ -61,7 +61,7 @@ let check(functions, structures)=
       body = []
     } map
     in List.fold_left add_bind StringMap.empty [
-      ("print",String);("height",Matrix);("width",Matrix);
+      ("print",Int);("height",Matrix);("width",Matrix);
       ("sum",Matrix);("mean",Matrix);("trans",Matrix);
       ("eig",Matrix);("inv",Matrix);("det",Matrix);
       ("imread",String)
