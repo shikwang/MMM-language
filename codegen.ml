@@ -1,11 +1,12 @@
 module L = Llvm
 module A = Ast
 open Sast 
+open Ast
 
 module StringMap = Map.Make(String)
 
 (* translate : Sast.program -> Llvm.module *)
-let translate (structs, functions) =
+let translate (functions, structs) =
   let context    = L.global_context () in
 
   (* Create the LLVM compilation module into which we will generate code *)
@@ -16,8 +17,10 @@ let translate (structs, functions) =
   and i8_t       = L.i8_type     context
   and i1_t       = L.i1_type     context
   and float_t    = L.double_type context
-  and array_t    = L.array_type  context
-  and void_t     = L.void_type   context in
+  and void_t     = L.void_type   context 
+  and array_t    = L.array_type
+  and pointer_t  = L.pointer_type
+  in
 
   (* Return the LLVM type for a MicroC type *)
   (* To do : matrix and struct *)
@@ -39,7 +42,11 @@ let translate (structs, functions) =
   let function_decls : (L.llvalue * sfunc_decl) StringMap.t =
     let function_decl m fdecl =
       let name = fdecl.sfname
-          and formal_types = Array.of_list (List.map (fun (t,_) -> ltype_of_typ t) fdecl.sformals)
+          and formal_types = Array.of_list(List.map (fun (t,_) -> ltype_of_typ t) 
+          (List.map (fun b -> match b with 
+            Primdecl(a,b) -> (a,b)
+          | Strudecl(a,b) -> (Struct,b)) fdecl.sformals) 
+          )
       in let ftype = L.function_type (ltype_of_typ fdecl.sftyp) formal_types in
       StringMap.add name (L.define_function name ftype the_module, fdecl) m in
     List.fold_left function_decl StringMap.empty functions in
@@ -58,37 +65,43 @@ let translate (structs, functions) =
     let local_vars =
       let add_formal m (t, n) p = 
         L.set_value_name n p;
-	let local = L.build_alloca (ltype_of_typ t) n builder in
+	    let local = L.build_alloca (ltype_of_typ t) n builder in
         ignore (L.build_store p local builder);
-	StringMap.add n local m 
+	    StringMap.add n local m 
 
       (* Allocate space for any locally declared variables and add the
       * resulting registers to our map *)
       and add_local m (t, n) =
-  let local_var = L.build_alloca (ltype_of_typ t) n builder
-  in StringMap.add n local_var m 
+      let local_var = L.build_alloca (ltype_of_typ t) n builder
+        in StringMap.add n local_var m 
       in
 
-      let formals = List.fold_left2 add_formal StringMap.empty fdecl.sformals
-          (Array.to_list (L.params the_function)) in
-      List.fold_left add_local formals fdecl.slocals 
+      let formals = List.fold_left2 add_formal StringMap.empty 
+                    (List.map (fun b -> match b with 
+                      Primdecl(a,b) -> (a,b)
+                      | Strudecl(a,b) -> (Struct,b)) fdecl.sformals)
+                    (Array.to_list (L.params the_function)) 
+      in List.fold_left add_local formals 
+                    (List.map (fun b -> match b with 
+                      Primdecl(a,b) -> (a,b)
+                      | Strudecl(a,b) -> (Struct,b)) fdecl.slocals)
     in
 
     (* Return the value for a variable or formal argument.
        Check local names first, then global names *)
-    let lookup n = try StringMap.find n local_vars
-                   with Not_found -> None
+    let lookup n = StringMap.find n local_vars 
     in
 
     (* Construct code for an expression; return its value *)
     let rec expr builder ((_, e) : sexpr) = match e with
 	      SIntlit i  -> L.const_int i32_t i
       | SBoolit b  -> L.const_int i1_t (if b then 1 else 0)
-      | SFloatlit l -> L.const_float_of_string float_t l
+      | SFloatlit l -> L.const_float float_t l
       | SEmpty     -> L.const_int i32_t 0
-      | SId s       -> L.build_load (lookup s) s builder
-      | SAssign (s, e) -> let e' = expr builder e in
-                          ignore(L.build_store e' (lookup s) builder); e'
+      | SVar s       -> L.build_load (lookup s) s builder
+      | SAssign (s, e) -> let e' = expr builder e in (match s with 
+                                                      (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
+                                                      | _ -> raise (Failure "Fail!"))              
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
         let e1' = expr builder e1
         and e2' = expr builder e2 in
@@ -106,6 +119,7 @@ let translate (structs, functions) =
         | A.And | A.Or ->
             raise (Failure "internal error: semant should have rejected and/or on float")
         ) e1' e2' "tmp" builder
+        
       | SBinop (e1, op, e2) ->
         let e1' = expr builder e1
         and e2' = expr builder e2 in
@@ -123,7 +137,7 @@ let translate (structs, functions) =
         | A.Greater -> L.build_icmp L.Icmp.Sgt
         | A.Geq     -> L.build_icmp L.Icmp.Sge
         ) e1' e2' "tmp" builder
-      | SUnop(op, ((t, _) as e)) ->
+      | SUop(op, ((t, _) as e)) ->
         let e' = expr builder e in
         (match op with
           A.Nega when t = A.Float -> L.build_fneg 
@@ -136,7 +150,7 @@ let translate (structs, functions) =
       | SCall (f, args) ->
          let (fdef, fdecl) = StringMap.find f function_decls in
 	       let llargs = List.rev (List.map (expr builder) (List.rev args)) in
-	       let result = (match fdecl.styp with 
+	       let result = (match fdecl.sftyp with 
                         A.Void -> ""
                       | _ -> f ^ "_result") in
          L.build_call fdef (Array.of_list llargs) result builder
@@ -158,7 +172,7 @@ let translate (structs, functions) =
     let rec stmt builder = function
 	      SBlock sl -> List.fold_left stmt builder sl
       | SExpr e -> ignore(expr builder e); builder 
-      | SReturn e -> ignore(match fdecl.styp with
+      | SReturn e -> ignore(match fdecl.sftyp with
                               (* Special "return nothing" instr *)
                               A.Void -> L.build_ret_void builder 
                               (* Build return statement *)
@@ -204,7 +218,7 @@ let translate (structs, functions) =
     let builder = stmt builder (SBlock fdecl.sbody) in
 
     (* Add a return if the last block falls off the end *)
-    add_terminal builder (match fdecl.styp with
+    add_terminal builder (match fdecl.sftyp with
         A.Void -> L.build_ret_void
       | A.Float -> L.build_ret (L.const_float float_t 0.0)
       | t -> L.build_ret (L.const_int (ltype_of_typ t) 0))
@@ -212,5 +226,3 @@ let translate (structs, functions) =
 
   List.iter build_function_body functions;
   the_module
-
-    

@@ -5,11 +5,13 @@ open Sast
 
    Check each struct, then check each function *)
 
+module StringMap = Map.Make(String)
+
 let check(functions, structures)=
   (* Raise an exception if the given list has a duplicate *)
   let report_duplicate except list =
     let rec helper = function
-    n1 :: n2 :: _ when n1 = n2 -> raise(Failure(exceptf n1))
+    n1 :: n2 :: _ when n1 = n2 -> raise(Failure(except n1))
       | _ :: t -> helper t
       | [] -> ()
     in helper (List.sort compare list)
@@ -55,7 +57,7 @@ let check(functions, structures)=
     let add_bind map (name,ty) = StringMap.add name {
       ftyp = Void;
       fname = name;
-      formals = [(ty,"x")];
+      formals = [Primdecl(ty,"x")];
       body = []
     } map
     in List.fold_left add_bind StringMap.empty [
@@ -76,7 +78,7 @@ let check(functions, structures)=
     with Not_found -> raise (Failure ("unrecognized function " ^ s))
   in
 
-  let _ = function_decl "main" in (* Ensure "main" is defined *)
+  let _ = find_func "main" in (* Ensure "main" is defined *)
 
   let struct_decls = List.fold_left (
     fun m st -> StringMap.add st.stname st m)
@@ -89,14 +91,13 @@ let check(functions, structures)=
   in
 
   let check_str str = 
-    let check_strvar stvar =
-      List.iter (check_not_void (fun n -> "illegal void formal " ^ n ^ " in " ^ str.stame)) stvar;
-      report_duplicate (fun n -> "duplicate formal " ^ n ^ " in " ^ str.stame)
-      (List.map (fun b -> match b with 
+    List.iter (check_not_void (fun n -> "illegal void formal " ^ n ^ " in " ^ str.stname)) str.stvar;
+    report_duplicate (fun n -> "duplicate formal " ^ n ^ " in " ^ str.stname)
+    (List.map (fun b -> match b with 
         Primdecl(_,n) -> n
-      | Strudecl(_,n) -> n) stvar);
-    in { sstname = str.stame;
-         sstvar = check_strvar str.stvar;}
+      | Strudecl(_,n) -> n) str.stvar);
+    { sstname = str.stname;
+      sstvar = str.stvar;}
   in
 
   let check_function func = 
@@ -138,10 +139,14 @@ let check(functions, structures)=
           | Return _ :: _   -> raise (Failure "nothing may follow a return")
           | Block sl :: ss  -> build_map_list a b c (sl @ ss) (* Flatten blocks *)
           | s :: ss         -> let (a1,b1,c1) = build_map a b c s in build_map_list a1 b1 c1 ss
-          | []              -> []
+          | []              -> (a, b, c)
           in build_map_list sym siz smp sl
       in 
-      let symb = List.fold_left (fun m (t, n) -> StringMap.add n t m) StringMap.empty (func.formals) 
+      let symb = 
+        let transfer m f = match f with 
+        Primdecl(ty,na) -> StringMap.add na ty m
+      | Strudecl(str,na) -> StringMap.add na Struct m in
+        List.fold_left transfer StringMap.empty (func.formals) 
       in
       build_map symb StringMap.empty StringMap.empty (Block func.body)
     in
@@ -167,34 +172,35 @@ let check(functions, structures)=
       | Matrixlit(l,(r,c)) -> if Array.length l = r * c then (Matrix, SMatrixlit(l, (r,c)))
                               else raise ( Failure ("illegal Matrix Dimension"))
       | Var s       -> (type_of_identifier s, SVar s)
-      | Struaccess (vname, member) ->
-          let stname = type_of_struct vname in 
+      | Struaccess (vname, member) -> (Int, SStruaccess(vname, member))
+          (*let stname = type_of_struct vname in 
           let st = find_str stname in
-          let me = try List.find member (List.map (fun b -> match b with 
+          let me = 
+            try List.find member (List.map (fun b -> match b with 
                                                               Primdecl(_,n) -> n
                                                             | Strudecl(_,n) -> n) st.stvar)
                     with Not_found -> raise (Failure ("unrecognized struct member " ^ member))
-          in match me with Primdecl(styp,_) -> (styp, SStruaccess(vname, member))
+          in match me with Primdecl(styp,_) -> *)
       | Assign(var, e) as ex -> 
           let (lt, s) = expr var
           and (rt, e') = expr e in
-          let err = "illegal assignment " ^ string_of_typ lt ^ " = " ^ 
-            string_of_typ rt ^ " in " ^ string_of_expr e
-          in match lt,rt,var,e with
+          let err = "illegal assignment " ^ string_of_datatyp lt ^ " = " ^ 
+            string_of_datatyp rt ^ " in " ^ string_of_expr e
+          in (match lt,rt,var,e with
              Struct,Struct,Var(a),Var(b) -> let lstn = type_of_struct a in 
                 let rstn = type_of_struct b in 
                 if lstn = rstn then (Struct, SAssign((lt, s), (rt, e')))
                 else raise (Failure ("illegal assignment " ^ lstn ^ " = " ^ rstn ^ " in " ^ string_of_expr e))
-           | _ ->(check_assign lt rt err, SAssign((lt, s), (rt, e')))
+           | _ ->(check_assign lt rt err, SAssign((lt, s), (rt, e'))))
       | Uop(op, e) as ex -> 
           let (t, e') = expr e in
           let ty = match op with
             Nega when t = Int || t = Float || t = Matrix -> t
           | Not  when t = Boolean -> Boolean
           | _ -> raise (Failure ("illegal unary operator " ^ 
-                            string_of_uop op ^ string_of_typ t ^
+                            string_of_uniop op ^ string_of_datatyp t ^
                             " in " ^ string_of_expr ex))
-          in (ty, SUnop(op, (t, e')))
+          in (ty, SUop(op, (t, e')))
       | Binop(e1, op, e2) as e -> 
           let (t1, e1') = expr e1 
           and (t2, e2') = expr e2 in
@@ -214,10 +220,10 @@ let check(functions, structures)=
           | Less | Leq | Greater | Geq when t1 = Int && t2 = Float -> Boolean
           | Less | Leq | Greater | Geq when t1 = Float && t2 = Int -> Boolean
           | And | Or when same && t1 = Boolean -> Boolean
-          | _ -> raise ( Failure ("illegal binary operator " ^ string_of_typ t1 ^ " " ^ string_of_op op ^ " " ^
-                  string_of_typ t2 ^ " in " ^ string_of_expr e))
+          | _ -> raise ( Failure ("illegal binary operator " ^ string_of_datatyp t1 ^ " " ^ string_of_biop op ^ " " ^
+                  string_of_datatyp t2 ^ " in " ^ string_of_expr e))
           in (ty, SBinop((t1, e1'), op, (t2, e2')))
-      | Comma(el) -> SComma(List.map expr el)
+      | Comma(el) -> (Void, SComma(List.map expr el))
       | Mataccess(m, e1, e2) -> let mty = type_of_identifier m in 
                                 if mty = Matrix then
                                   let (t1, se1) = expr e1 in let (t2, se2) = expr e2 in 
@@ -228,7 +234,7 @@ let check(functions, structures)=
       | Matslicing(m, e1, e2) -> let mty = type_of_identifier m in 
                                  if mty = Matrix then (Matrix, SMatslicing(m, expr e1, expr e2))
                                  else raise ( Failure (m ^ "is not a matrix!"))
-      | Range(a,b) -> match a,b with
+      | Range(a,b) -> (match a,b with
                         Beg, End -> (Int, SRange(SBeg, SEnd))
                       | Beg, Ind(s) -> let (t1, s1) = expr s in if t1 = Int then (Int, SRange(SBeg, SInd(t1, s1)))
                                        else raise ( Failure ("Illegeal Range"))
@@ -237,7 +243,7 @@ let check(functions, structures)=
                       | Ind(sl), Ind(ss) -> let (t1, s1) = expr sl in let (t2, s2) = expr ss in
                                             if t1 = Int && t2 = Int then (Int, SRange(SInd(t1, s1),SInd(t2, s2)))
                                             else raise ( Failure ("Illegeal Range"))
-                      | _ -> raise ( Failure ("Illegeal Index"))
+                      | _ -> raise ( Failure ("Illegeal Index")))
       | Call(fname, args) as call -> 
           let fd = find_func fname in
           let param_length = List.length fd.formals in
@@ -246,8 +252,7 @@ let check(functions, structures)=
                             " arguments in " ^ string_of_expr call))
           else 
           let check_call ff e = let (et, e') = expr e in 
-            let err = "illegal argument found " ^ string_of_typ et ^ 
-            " expected " ^ string_of_typ styp ^ " in " ^ string_of_expr e
+            let err = "illegal argument found " ^ string_of_datatyp et ^ " in " ^ string_of_expr e
             in match ff with 
                 Primdecl(styp,_) -> (check_assign styp et err, e')
               | Strudecl(strty,_) -> (match e with 
@@ -275,15 +280,15 @@ let check(functions, structures)=
     | Return e -> let (t, e') = expr e in
       if t = func.ftyp then SReturn (t, e') 
       else raise (
-      Failure ("return gives " ^ string_of_typ t ^ " expected " ^
-      string_of_typ func.ftyp ^ " in " ^ string_of_expr e))
+      Failure ("return gives " ^ string_of_datatyp t ^ " expected " ^
+      string_of_datatyp func.ftyp ^ " in " ^ string_of_expr e))
 
     | Initial(t, v, e) -> let (t', e') = expr e in
       if t' = t then match t with 
-        Matrix | Struct | Void -> raise ( Failure (string_of_typ t ^ " cannot be initialed this way!"))
+        Matrix | Struct | Void -> raise ( Failure (string_of_datatyp t ^ " cannot be initialed this way!"))
       | _ -> SInitial(t, v, (t', e'))
-      else raise ( Failure ("Initial gives " ^ string_of_typ t' ^ " expected " ^
-      string_of_typ t ^ " in " ^ string_of_expr e))
+      else raise ( Failure ("Initial gives " ^ string_of_datatyp t' ^ " expected " ^
+      string_of_datatyp t ^ " in " ^ string_of_expr e))
 
     | Defaultmat(m, r, c) -> SDefaultmat(m, r, c)
 
@@ -295,8 +300,8 @@ let check(functions, structures)=
                       " members in " ^ stname ))
       else let check_mem sv e = match sv with Primdecl(styp,_) ->
         let (et, e') = expr e in 
-        let err = "illegal argument found " ^ string_of_typ et ^ 
-        " expected " ^ string_of_typ styp ^ " in " ^ string_of_expr e
+        let err = "illegal argument found " ^ string_of_datatyp et ^ 
+        " expected " ^ string_of_datatyp styp ^ " in " ^ string_of_expr e
         in (check_assign styp et err, e')
       in 
       let elist' = List.map2 check_mem st.stvar elist in SIniStrucct(v, stname, elist')
@@ -314,9 +319,9 @@ let check(functions, structures)=
       { sftyp = func.ftyp;
         sfname = func.fname;
         sformals = func.formals;
-        slocals = symbols;
+        slocals = List.map (fun (v,ty) -> Primdecl(ty,v)) (StringMap.bindings symbols);
         sbody = match check_stmt (Block func.body) with
         SBlock(sl) -> sl
         | _ -> raise (Failure ("internal error: block didn't become a block?"))
       }
-  in (List.map check_str structures, List.map check_function functions)
+  in (List.map check_function functions, List.map check_str structures)

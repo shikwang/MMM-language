@@ -1,52 +1,7 @@
-(* Semantically-checked Abstract Syntax Tree and functions for printing it *)
-
 open Ast
-
-type sexpr = datatyp * sx
-and sx =
-    SIntlit of int
-  | SStringlit of string
-  | SFloatlit of float
-  | SBoolit of bool
-  | SMatrixlit of float array * (int * int)
-  | SVar of string
-  | SStruaccess of string * string
-  | SBinop of sexpr * biop * sexpr
-  | SComma of sexpr list
-  | SAssign of sexpr * sexpr
-  | SUop of uniop * sexpr
-  | SCall of string * sexpr list
-  | SMataccess of string * sexpr * sexpr
-  | SMatslicing of string * sexpr * sexpr
-  | SEmpty (*declare variable without assigning value*)
-  | SRange of sindex * sindex
-and sindex = SBeg | SEnd | SInd of sexpr
-
-type sstmt =
-    SBlock of sstmt list
-  | SExpr of sexpr
-  | SReturn of sexpr
-  | SIf of sexpr * sstmt * sstmt
-  | SFor of sexpr * sexpr * sexpr * sstmt
-  | SWhile of sexpr * sstmt
-  | SInitial of datatyp * string * sexpr
-  | SDefaultmat of string * int * int
-  | SIniStrucct of string * string * sexpr list
-
-type sfunc_decl = {
-    mutable sftyp : datatyp;
-    sfname : string;
-    sformals : bind list;
-    slocals : bind list;
-    sbody : sstmt list;
-  }
-
-type sstruc_decl = {
-    sstname : string;
-    sstvar : bind list;
-  }
-
-type sprogram =  sfunc_decl list * sstruc_decl list
+open Sast
+open Semant
+open Print
 
 (* Pretty-printing functions *)
 let rec string_of_sexpr = function
@@ -91,3 +46,7 @@ let string_of_sfdecl fdecl = "func " ^ fdecl.sfname ^ "(" ^ String.concat ", " (
    ")\n{\n" ^ String.concat "" (List.map string_of_sstmt fdecl.sbody) ^ "}\n"
 
 let string_of_sprogram (funcs, structs) = String.concat "\n" (List.map string_of_sstdecl structs) ^ "\n" ^String.concat "\n" (List.map string_of_sfdecl funcs)
+
+let _ = let lexbuf = Lexing.from_channel stdin in
+let (funcs,strucs) = Parser.program Scanner.token lexbuf in let expr = check(funcs, strucs) in 
+let result = string_of_sprogram expr in print_endline result
