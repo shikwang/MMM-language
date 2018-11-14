@@ -35,7 +35,7 @@ let translate (functions, structs) =
   let printf_t : L.lltype = 
     L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
   let printf_func : L.llvalue = 
-    L.declare_function "print" printf_t the_module in
+    L.declare_function "printf" printf_t the_module in
 
   (* Define each function (arguments and return type) so we can 
     call it even before we've created its body *)
@@ -101,7 +101,7 @@ let translate (functions, structs) =
       | SVar s       -> L.build_load (lookup s) s builder
       | SAssign (s, e) -> let e' = expr builder e in (match s with 
                                                       (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
-                                                      | _ -> raise (Failure "Fail!"))              
+                                                      | _ -> raise (Failure "Assign Failiure!"))              
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
         let e1' = expr builder e1
         and e2' = expr builder e2 in
@@ -145,7 +145,7 @@ let translate (functions, structs) =
         | A.Not                   -> L.build_not) e' "tmp" builder
       | SCall ("print", [e]) ->
 	      L.build_call printf_func [| int_format_str ; (expr builder e) |]
-	      "print" builder
+	      "printf" builder
       
       | SCall (f, args) ->
          let (fdef, fdecl) = StringMap.find f function_decls in
