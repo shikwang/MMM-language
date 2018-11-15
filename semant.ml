@@ -179,7 +179,7 @@ let check(functions, structures)=
             let rec find x lst = match lst with
                                     [] -> raise (Failure ("unrecognized struct member " ^ x))
                                   | hd :: tl -> (match hd with 
-                                                    Primdecl(ty, x) -> ty
+                                                    Primdecl(ty, nm) -> if nm = x then ty else find x tl
                                                   | _ -> find x tl)
             in find member st.stvar         
           in (mt, SStruaccess(vname, member))
