@@ -1,0 +1,13 @@
+struct Image {
+    int BW;
+    int R;
+    int B
+}
+
+func int main()
+{
+    struct K = Image(1,2,3);
+    float a = K.R;
+    print(1);
+    return 1;    
+}
