@@ -56,7 +56,8 @@ let translate (functions, structs) =
     let (the_function, _) = StringMap.find fdecl.sfname function_decls in
     let builder = L.builder_at_end context (L.entry_block the_function) in
 
-    let int_format_str = L.build_global_stringptr "%d\n" "fmt" builder
+    let string_format_str = L.build_global_stringptr "%s\n" "fmt" builder
+    and int_format_str = L.build_global_stringptr "%d\n" "fmt" builder
     and float_format_str = L.build_global_stringptr "%g\n" "fmt" builder in
 
     (* Construct the function's "locals": formal arguments and locally
@@ -97,6 +98,7 @@ let translate (functions, structs) =
 	      SIntlit i  -> L.const_int i32_t i
       | SBoolit b  -> L.const_int i1_t (if b then 1 else 0)
       | SFloatlit l -> L.const_float float_t l
+      | SStringlit s -> L.build_global_stringptr s "tmp" builder
       | SEmpty     -> L.const_int i32_t 0
       | SVar s       -> L.build_load (lookup s) s builder
       | SAssign (s, e) -> let e' = expr builder e in (match s with 
@@ -145,8 +147,13 @@ let translate (functions, structs) =
         | A.Not                   -> L.build_not) e' "tmp" builder
       | SCall ("print", [e]) ->
 	      L.build_call printf_func [| int_format_str ; (expr builder e) |]
-	      "printf" builder
-      
+        "printf" builder      
+
+      (*Add print functions, other built-in functions*)
+      | SCall ("printStr", [e]) ->
+        L.build_call printf_func [| string_format_str ; (expr builder e) |]
+        "printf" builder
+
       | SCall (f, args) ->
          let (fdef, fdecl) = StringMap.find f function_decls in
 	       let llargs = List.rev (List.map (expr builder) (List.rev args)) in
@@ -211,7 +218,9 @@ let translate (functions, structs) =
 
       (* Implement for loops as while loops *)
       | SFor (e1, e2, e3, body) -> stmt builder
-	      ( SBlock [SExpr e1 ; SWhile (e2, SBlock [body ; SExpr e3]) ] )
+        ( SBlock [SExpr e1 ; SWhile (e2, SBlock [body ; SExpr e3]) ] )
+      (* Implement initial here *)
+      (*| SInitial (typ,name,expr) -> *)
     in
 
     (* Build the code for each statement in the function *)

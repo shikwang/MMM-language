@@ -30,15 +30,15 @@ clean :
 # Building the tarball
 
 TESTS = \
-  for1 func1 func2 func3 func4
+  for1 func1 func2 func3 func4 string1
 
 FAILS = \
   assign1 assign2 assign3 assign4 \
   for1 func1 func2 func3 func4 func5 \
   if1 matrix1
 
-TESTFILES = $(TESTS:%=test-%.mm) $(TESTS:%=test-%.out) \
-	    $(FAILS:%=fail-%.mm) $(FAILS:%=fail-%.err)
+TESTFILES = $(TESTS:%=test-%.mmm) $(TESTS:%=test-%.out) \
+	    $(FAILS:%=fail-%.mmm) $(FAILS:%=fail-%.err)
 
 TARFILES = ast.ml sast.ml codegen.ml Makefile _tags mmm.ml parser.mly \
 	README scanner.mll semant.ml testall.sh \
