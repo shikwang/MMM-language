@@ -43,7 +43,7 @@ let translate (functions, structs) =
     let function_decl m fdecl =
       let name = fdecl.sfname
           and formal_types = Array.of_list(List.map (fun (t,_) -> ltype_of_typ t) 
-          (List.map (fun b -> match b with 
+          (List.map (fun c -> match c with 
             Primdecl(a,b) -> (a,b)
           | Strudecl(a,b) -> (Struct,b)) fdecl.sformals) 
           )
@@ -78,12 +78,12 @@ let translate (functions, structs) =
       in
 
       let formals = List.fold_left2 add_formal StringMap.empty 
-                    (List.map (fun b -> match b with 
+                    (List.map (fun c -> match c with 
                       Primdecl(a,b) -> (a,b)
                       | Strudecl(a,b) -> (Struct,b)) fdecl.sformals)
                     (Array.to_list (L.params the_function)) 
       in List.fold_left add_local formals 
-                    (List.map (fun b -> match b with 
+                    (List.map (fun c -> match c with 
                       Primdecl(a,b) -> (a,b)
                       | Strudecl(a,b) -> (Struct,b)) fdecl.slocals)
     in
@@ -99,6 +99,9 @@ let translate (functions, structs) =
       | SBoolit b  -> L.const_int i1_t (if b then 1 else 0)
       | SFloatlit l -> L.const_float float_t l
       | SStringlit s -> L.build_global_stringptr s "tmp" builder
+
+      (*| SMatrixlit (f_array,(r,c)) -> L.const_array (array_t float_t r*c) f_array*)
+      
       | SEmpty     -> L.const_int i32_t 0
       | SVar s       -> L.build_load (lookup s) s builder
       | SAssign (s, e) -> let e' = expr builder e in (match s with 
@@ -220,7 +223,10 @@ let translate (functions, structs) =
       | SFor (e1, e2, e3, body) -> stmt builder
         ( SBlock [SExpr e1 ; SWhile (e2, SBlock [body ; SExpr e3]) ] )
       (* Implement initial here *)
-      (*| SInitial (typ,name,expr) -> *)
+      | SInitial (typ, name, e) -> (match e with 
+                                        (_, SEmpty) -> builder 
+                                      | _ -> let e' = expr builder e in
+                                             (ignore(L.build_store e' (lookup name) builder); builder))
     in
 
     (* Build the code for each statement in the function *)
