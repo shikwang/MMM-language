@@ -76,16 +76,16 @@ let translate (functions, structs) =
       let local_var = L.build_alloca (ltype_of_typ t) n builder
         in StringMap.add n local_var m 
       in
-
-      let formals = List.fold_left2 add_formal StringMap.empty 
-                    (List.map (fun c -> match c with 
-                      Primdecl(a,b) -> (a,b)
-                      | Strudecl(a,b) -> (Struct,b)) fdecl.sformals)
+      let formal_list = List.map (fun c -> match c with 
+                                              Primdecl(a,b) -> (a,b)
+                                            | Strudecl(a,b) -> (Struct,b)) fdecl.sformals
+      in
+      let formals = List.fold_left2 add_formal StringMap.empty formal_list
                     (Array.to_list (L.params the_function)) 
-      in List.fold_left add_local formals 
+      in List.fold_left add_local formals (List.filter (fun s -> not (List.mem s formal_list))
                     (List.map (fun c -> match c with 
                       Primdecl(a,b) -> (a,b)
-                      | Strudecl(a,b) -> (Struct,b)) fdecl.slocals)
+                      | Strudecl(a,b) -> (Struct,b))  fdecl.slocals))
     in
 
     (* Return the value for a variable or formal argument.
@@ -157,7 +157,7 @@ let translate (functions, structs) =
         L.build_call printf_func [| string_format_str ; (expr builder e) |]
         "printf" builder
 
-      | SCall (f, args) ->
+      | SCall (f, args) -> 
          let (fdef, fdecl) = StringMap.find f function_decls in
 	       let llargs = List.rev (List.map (expr builder) (List.rev args)) in
 	       let result = (match fdecl.sftyp with 
