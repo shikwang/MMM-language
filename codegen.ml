@@ -19,8 +19,13 @@ let translate (functions, structs) =
   and float_t    = L.double_type context
   and void_t     = L.void_type   context 
   and array_t    = L.array_type
-  and pointer_t  = L.pointer_type
+  and pointer_t  = L.pointer_type 
   in
+
+  (*
+  let matrix_t = L.named_struct_type context "matrix_t" in 
+    L.struct_set_body matrix_t [|L.pointer_type float_t; i32_t; i32_t|] false;
+  *)
 
   (* Return the LLVM type for a MicroC type *)
   (* To do : matrix and struct *)
@@ -30,6 +35,7 @@ let translate (functions, structs) =
       | A.Float -> float_t
       | A.Void  -> void_t
       | A.String  -> pointer_t i8_t
+      | A.Matrix -> array_t float_t 4 (*the int must be equal to total size of the matrix*)
   in
 
   let printf_t : L.lltype = 
@@ -100,7 +106,13 @@ let translate (functions, structs) =
       | SFloatlit l -> L.const_float float_t l
       | SStringlit s -> L.build_global_stringptr s "tmp" builder
 
-      (*| SMatrixlit (f_array,(r,c)) -> L.const_array (array_t float_t r*c) f_array*)
+      (*turn float array into list, then change type to float_t, then back to array*)
+      | SMatrixlit (f_array,(r,c)) -> 
+        let l = r * c in 
+        let f_array_list = Array.to_list f_array in
+        let f_array_list_ll = List.map(L.const_float float_t) f_array_list in
+        let f_array_list_ll_array = Array.of_list f_array_list_ll in
+        L.const_array (array_t float_t l) f_array_list_ll_array
       
       | SEmpty     -> L.const_int i32_t 0
       | SVar s       -> L.build_load (lookup s) s builder
