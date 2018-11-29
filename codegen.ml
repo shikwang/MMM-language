@@ -22,10 +22,8 @@ let translate (functions, structs) =
   and pointer_t  = L.pointer_type 
   in
 
-  (*
   let matrix_t = L.named_struct_type context "matrix_t" in 
     L.struct_set_body matrix_t [|L.pointer_type float_t; i32_t; i32_t|] false;
-  *)
 
   (* Return the LLVM type for a MicroC type *)
   (* To do : matrix and struct *)
@@ -35,7 +33,10 @@ let translate (functions, structs) =
       | A.Float -> float_t
       | A.Void  -> void_t
       | A.String  -> pointer_t i8_t
+      (*
       | A.Matrix -> array_t float_t 4 (*the int must be equal to total size of the matrix*)
+      *)
+      | A.Matrix -> pointer_t matrix_t
   in
 
   let printf_t : L.lltype = 
@@ -99,6 +100,21 @@ let translate (functions, structs) =
     let lookup n = StringMap.find n local_vars 
     in
 
+    (*the function builds the matrixlit*)
+    let build_matrix_lit(f_array,(r,c)) builder =
+      let mat = L.build_array_malloc float_t (L.const_int i32_t (r*c)) "system_mat" builder in
+      (*try cast pointer*)
+      (for x = 0 to (r*c-1) do
+        let element_ptr = L.build_gep mat [|(L.const_int i32_t x)|] "element_ptr" builder in 
+        ignore(L.build_store (L.const_float float_t f_array.(x)) element_ptr builder)
+      done);
+      let m = L.build_malloc matrix_t "m" builder in
+      let m_mat = L.build_struct_gep m 0 "m_mat" builder in ignore(L.build_store mat m_mat builder);
+      let m_r = L.build_struct_gep m 1 "m_r" builder in ignore(L.build_store (L.const_int i32_t r) m_r builder);
+      let m_c = L.build_struct_gep m 2 "m_c" builder in ignore(L.build_store (L.const_int i32_t c) m_c builder);
+      m
+    in
+      
     (* Construct code for an expression; return its value *)
     let rec expr builder ((_, e) : sexpr) = match e with
 	      SIntlit i  -> L.const_int i32_t i
@@ -106,14 +122,16 @@ let translate (functions, structs) =
       | SFloatlit l -> L.const_float float_t l
       | SStringlit s -> L.build_global_stringptr s "tmp" builder
 
-      (*turn float array into list, then change type to float_t, then back to array*)
+      (*turn float array into list, then change type to float_t, then back to array
       | SMatrixlit (f_array,(r,c)) -> 
         let l = r * c in 
         let f_array_list = Array.to_list f_array in
         let f_array_list_ll = List.map(L.const_float float_t) f_array_list in
         let f_array_list_ll_array = Array.of_list f_array_list_ll in
         L.const_array (array_t float_t l) f_array_list_ll_array
-      
+      *)
+      | SMatrixlit (f_array,(r,c)) -> build_matrix_lit(f_array,(r,c)) builder
+
       | SEmpty     -> L.const_int i32_t 0
       | SVar s       -> L.build_load (lookup s) s builder
       | SAssign (s, e) -> let e' = expr builder e in (match s with 
@@ -154,6 +172,20 @@ let translate (functions, structs) =
         | A.Greater -> L.build_icmp L.Icmp.Sgt
         | A.Geq     -> L.build_icmp L.Icmp.Sge
         ) e1' e2' "tmp" builder
+
+      (* operator for matrix
+      | SBinop ((A.Matrix,_ ) as e1, op, e2) ->
+        let e1' = expr builder e1 
+        and e2' = expr builder e2 in
+        (match op with
+          A.Add ->
+          A.Sub ->
+          A.Mult ->
+          A.Elemult ->
+          A.Elediv ->
+        )
+      *)
+
       | SUop(op, ((t, _) as e)) ->
         let e' = expr builder e in
         (match op with
@@ -168,6 +200,13 @@ let translate (functions, structs) =
       | SCall ("printStr", [e]) ->
         L.build_call printf_func [| string_format_str ; (expr builder e) |]
         "printf" builder
+
+      | SCall ("printFloat",[e]) ->
+        L.build_call printf_func [| float_format_str ; (expr builder e) |]
+        "printf" builder
+      
+      (* print matrix function *)
+        
 
       | SCall (f, args) -> 
          let (fdef, fdecl) = StringMap.find f function_decls in
