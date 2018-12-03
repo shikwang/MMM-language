@@ -25,6 +25,8 @@ let translate (functions, structs) =
   let matrix_t = L.named_struct_type context "matrix_t" in 
     L.struct_set_body matrix_t [|L.pointer_type float_t; i32_t; i32_t|] false;
 
+  let matrixptr_t = L.pointer_type matrix_t in
+
   (* Return the LLVM type for a MicroC type *)
   (* To do : matrix and struct *)
   let ltype_of_typ = function
@@ -36,13 +38,17 @@ let translate (functions, structs) =
       (*
       | A.Matrix -> array_t float_t 4 (*the int must be equal to total size of the matrix*)
       *)
-      | A.Matrix -> pointer_t matrix_t
+      | A.Matrix -> matrixptr_t
   in
 
-  let printf_t : L.lltype = 
-    L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
-  let printf_func : L.llvalue = 
-    L.declare_function "printf" printf_t the_module in
+  (* function types *)
+  let printf_t : L.lltype = L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
+  let printf_func : L.llvalue = L.declare_function "printf" printf_t the_module in
+
+  (*
+  let getHeight_t : L.function_type i32_t [| matrix_t |] in
+  let getHeight_func = L.declare_function "height" getHeight_t the_module in 
+  *)
 
   (* Define each function (arguments and return type) so we can 
     call it even before we've created its body *)
@@ -112,7 +118,7 @@ let translate (functions, structs) =
       let m_mat = L.build_struct_gep m 0 "m_mat" builder in ignore(L.build_store mat m_mat builder);
       let m_r = L.build_struct_gep m 1 "m_r" builder in ignore(L.build_store (L.const_int i32_t r) m_r builder);
       let m_c = L.build_struct_gep m 2 "m_c" builder in ignore(L.build_store (L.const_int i32_t c) m_c builder);
-      m
+      L.build_pointercast m matrixptr_t "m" builder
     in
 
     let is_matrix ptr = 
@@ -234,6 +240,9 @@ let translate (functions, structs) =
       
       (* print matrix function *)
         
+      | SCall ("height",[e]) ->
+        let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
+        r
 
       | SCall (f, args) -> 
          let (fdef, fdecl) = StringMap.find f function_decls in
