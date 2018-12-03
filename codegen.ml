@@ -114,7 +114,14 @@ let translate (functions, structs) =
       let m_c = L.build_struct_gep m 2 "m_c" builder in ignore(L.build_store (L.const_int i32_t c) m_c builder);
       m
     in
-      
+
+    let is_matrix ptr = 
+      let ltype_string = L.string_of_lltype (L.type_of ptr) in
+      match ltype_string with
+        "%matrix_t*" -> true
+      | _ -> false
+    in
+
     (* Construct code for an expression; return its value *)
     let rec expr builder ((_, e) : sexpr) = match e with
 	      SIntlit i  -> L.const_int i32_t i
@@ -131,12 +138,32 @@ let translate (functions, structs) =
         L.const_array (array_t float_t l) f_array_list_ll_array
       *)
       | SMatrixlit (f_array,(r,c)) -> build_matrix_lit(f_array,(r,c)) builder
+      | SMataccess (s,e1,e2) ->
+        let l = 
+          let e1' = expr builder e1 and e2' = expr builder e2 in
+          let ptr = lookup s in
+          let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat_mat" builder in
+          let r = L.build_load (L.build_struct_gep ptr 1 "m_r" builder) "r_mat" builder in
+          let c = L.build_load (L.build_struct_gep ptr 2 "m_c" builder) "c_mat" builder in
+
+          (*L.build_load (build_matrix_access (mat r c e1' e2' builder) "element_ptr" builder)*)
+          let index = L.build_add e2' (L.build_mul e1' c "tmp" builder) "index" builder in
+          L.build_gep mat [|index|] "element_ptr" builder
+        in
+        L.build_load l "element" builder
 
       | SEmpty     -> L.const_int i32_t 0
-      | SVar s       -> L.build_load (lookup s) s builder
-      | SAssign (s, e) -> let e' = expr builder e in (match s with 
-                                                      (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
-                                                      | _ -> raise (Failure "Assign Failiure!"))              
+      | SVar s     -> 
+        let ptr = lookup s in
+        (match (is_matrix ptr) with
+          | true -> ptr
+          | false -> (L.build_load (ptr) s builder))
+
+      | SAssign (s, e) -> 
+        let e' = expr builder e in 
+          (match s with 
+            | (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
+            | _ -> raise (Failure "Assign Failiure!"))              
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
         let e1' = expr builder e1
         and e2' = expr builder e2 in

@@ -38,6 +38,7 @@ let check(functions, structures)=
     | [] -> ()
     | "print" :: _ -> raise (Failure ("function print may not be defined"))
     | "printStr" :: _ -> raise (Failure ("function printStr may not be defined"))
+    | "printFloat" :: _-> raise (Failure ("function printFloat may not be defined"))
     | "height" :: _ -> raise (Failure ("function height may not be defined"))
     | "width" :: _ -> raise (Failure ("function width may not be defined"))
     | "sum" :: _ -> raise (Failure ("function sum may not be defined"))
@@ -62,7 +63,8 @@ let check(functions, structures)=
       body = []
     } map
     in List.fold_left add_bind StringMap.empty [
-      ("print",Int);("printStr",String);("height",Matrix);("width",Matrix);
+      ("print",Int);("printStr",String);("printFloat",Float);
+      ("height",Matrix);("width",Matrix);
       ("sum",Matrix);("mean",Matrix);("trans",Matrix);
       ("eig",Matrix);("inv",Matrix);("det",Matrix);
       ("imread",String)
