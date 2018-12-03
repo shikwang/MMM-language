@@ -38,6 +38,7 @@ let check(functions, structures)=
     | [] -> ()
     | "print" :: _ -> raise (Failure ("function print may not be defined"))
     | "printStr" :: _ -> raise (Failure ("function printStr may not be defined"))
+    | "printFloat" :: _-> raise (Failure ("function printFloat may not be defined"))
     | "height" :: _ -> raise (Failure ("function height may not be defined"))
     | "width" :: _ -> raise (Failure ("function width may not be defined"))
     | "sum" :: _ -> raise (Failure ("function sum may not be defined"))
@@ -55,18 +56,19 @@ let check(functions, structures)=
 
   (* Add function declaration for a named function *)
   let built_in_decls =  
-    let add_bind map (name,ty) = StringMap.add name {
-      ftyp = Void;
+    let add_bind map (name,ty,rty) = StringMap.add name {
+      ftyp = rty;
       fname = name;
       formals = [Primdecl(ty,"x")];
       body = []
     } map
     in List.fold_left add_bind StringMap.empty [
-      ("print",Int);("printStr",String);("height",Matrix);("width",Matrix);
-      ("sum",Matrix);("mean",Matrix);("trans",Matrix);
-      ("eig",Matrix);("inv",Matrix);("det",Matrix);
-      ("imread",String)
-      ]
+      ("print",Int,Void);("printStr",String,Void);("printFloat",Float,Void);
+      ("height",Matrix,Int);("width",Matrix,Int);
+      ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Void);
+      ("eig",Matrix,Void);("inv",Matrix,Void);("det",Matrix,Void);
+      ("imread",String,Void)
+    ]
   in
 
   let function_decls = List.fold_left (

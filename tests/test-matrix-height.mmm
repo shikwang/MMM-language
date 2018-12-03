@@ -1,0 +1,9 @@
+func int main()
+{
+    matrix m = [1.1,2.2;3.3,4.4];
+    int a;
+    a = height(m);
+    print(a);
+    return 0;    
+}
+

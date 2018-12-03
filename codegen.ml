@@ -25,6 +25,8 @@ let translate (functions, structs) =
   let matrix_t = L.named_struct_type context "matrix_t" in 
     L.struct_set_body matrix_t [|L.pointer_type float_t; i32_t; i32_t|] false;
 
+  let matrixptr_t = L.pointer_type matrix_t in
+
   (* Return the LLVM type for a MicroC type *)
   (* To do : matrix and struct *)
   let ltype_of_typ = function
@@ -36,13 +38,17 @@ let translate (functions, structs) =
       (*
       | A.Matrix -> array_t float_t 4 (*the int must be equal to total size of the matrix*)
       *)
-      | A.Matrix -> pointer_t matrix_t
+      | A.Matrix -> matrixptr_t
   in
 
-  let printf_t : L.lltype = 
-    L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
-  let printf_func : L.llvalue = 
-    L.declare_function "printf" printf_t the_module in
+  (* function types *)
+  let printf_t : L.lltype = L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
+  let printf_func : L.llvalue = L.declare_function "printf" printf_t the_module in
+
+  (*
+  let getHeight_t : L.function_type i32_t [| matrix_t |] in
+  let getHeight_func = L.declare_function "height" getHeight_t the_module in 
+  *)
 
   (* Define each function (arguments and return type) so we can 
     call it even before we've created its body *)
@@ -112,9 +118,16 @@ let translate (functions, structs) =
       let m_mat = L.build_struct_gep m 0 "m_mat" builder in ignore(L.build_store mat m_mat builder);
       let m_r = L.build_struct_gep m 1 "m_r" builder in ignore(L.build_store (L.const_int i32_t r) m_r builder);
       let m_c = L.build_struct_gep m 2 "m_c" builder in ignore(L.build_store (L.const_int i32_t c) m_c builder);
-      m
+      L.build_pointercast m matrixptr_t "m" builder
     in
-      
+
+    let is_matrix ptr = 
+      let ltype_string = L.string_of_lltype (L.type_of ptr) in
+      match ltype_string with
+        "%matrix_t*" -> true
+      | _ -> false
+    in
+
     (* Construct code for an expression; return its value *)
     let rec expr builder ((_, e) : sexpr) = match e with
 	      SIntlit i  -> L.const_int i32_t i
@@ -131,12 +144,32 @@ let translate (functions, structs) =
         L.const_array (array_t float_t l) f_array_list_ll_array
       *)
       | SMatrixlit (f_array,(r,c)) -> build_matrix_lit(f_array,(r,c)) builder
+      | SMataccess (s,e1,e2) ->
+        let l = 
+          let e1' = expr builder e1 and e2' = expr builder e2 in
+          let ptr = lookup s in
+          let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat_mat" builder in
+          let r = L.build_load (L.build_struct_gep ptr 1 "m_r" builder) "r_mat" builder in
+          let c = L.build_load (L.build_struct_gep ptr 2 "m_c" builder) "c_mat" builder in
+
+          (*L.build_load (build_matrix_access (mat r c e1' e2' builder) "element_ptr" builder)*)
+          let index = L.build_add e2' (L.build_mul e1' c "tmp" builder) "index" builder in
+          L.build_gep mat [|index|] "element_ptr" builder
+        in
+        L.build_load l "element" builder
 
       | SEmpty     -> L.const_int i32_t 0
-      | SVar s       -> L.build_load (lookup s) s builder
-      | SAssign (s, e) -> let e' = expr builder e in (match s with 
-                                                      (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
-                                                      | _ -> raise (Failure "Assign Failiure!"))              
+      | SVar s     -> 
+        let ptr = lookup s in
+        (match (is_matrix ptr) with
+          | true -> ptr
+          | false -> (L.build_load (ptr) s builder))
+
+      | SAssign (s, e) -> 
+        let e' = expr builder e in 
+          (match s with 
+            | (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
+            | _ -> raise (Failure "Assign Failiure!"))              
       | SBinop ((A.Float,_ ) as e1, op, e2) ->
         let e1' = expr builder e1
         and e2' = expr builder e2 in
@@ -207,6 +240,9 @@ let translate (functions, structs) =
       
       (* print matrix function *)
         
+      | SCall ("height",[e]) ->
+        let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
+        r
 
       | SCall (f, args) -> 
          let (fdef, fdecl) = StringMap.find f function_decls in
