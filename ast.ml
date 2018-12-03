@@ -1,5 +1,6 @@
 type biop = Add | Sub | Mult | Div | Eq | Neq | Less | Leq | Greater | Geq | And | Or | Elemult | Elediv
 
+(*elemult is matrix between int*)
 type uniop = Not | Nega
 
 type datatyp = Int | Float | Boolean | Matrix | String | Void | Struct
