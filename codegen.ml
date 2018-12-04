@@ -25,7 +25,7 @@ let translate (functions, structs) =
   let matrix_t = L.named_struct_type context "matrix_t" in 
     L.struct_set_body matrix_t [|L.pointer_type float_t; i32_t; i32_t|] false;
 
-  let matrixptr_t = L.pointer_type matrix_t in
+  (*let matrixptr_t = L.pointer_type matrix_t in*)
 
   (* Return the LLVM type for a MicroC type *)
   (* To do : matrix and struct *)
@@ -38,7 +38,7 @@ let translate (functions, structs) =
       (*
       | A.Matrix -> array_t float_t 4 (*the int must be equal to total size of the matrix*)
       *)
-      | A.Matrix -> matrixptr_t
+      | A.Matrix -> L.pointer_type matrix_t
   in
 
   (* function types *)
@@ -118,7 +118,7 @@ let translate (functions, structs) =
       let m_mat = L.build_struct_gep m 0 "m_mat" builder in ignore(L.build_store mat m_mat builder);
       let m_r = L.build_struct_gep m 1 "m_r" builder in ignore(L.build_store (L.const_int i32_t r) m_r builder);
       let m_c = L.build_struct_gep m 2 "m_c" builder in ignore(L.build_store (L.const_int i32_t c) m_c builder);
-      L.build_pointercast m matrixptr_t "m" builder
+      m (*L.build_pointercast m matrixptr_t "m" builder*)
     in
 
     let is_matrix ptr = 
@@ -145,25 +145,25 @@ let translate (functions, structs) =
       *)
       | SMatrixlit (f_array,(r,c)) -> build_matrix_lit(f_array,(r,c)) builder
       | SMataccess (s,e1,e2) ->
-        let l = 
+        let idx = 
           let e1' = expr builder e1 and e2' = expr builder e2 in
-          let ptr = lookup s in
-          let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat_mat" builder in
+          let ptr = L.build_load (lookup s) s builder in
+          let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
           let r = L.build_load (L.build_struct_gep ptr 1 "m_r" builder) "r_mat" builder in
           let c = L.build_load (L.build_struct_gep ptr 2 "m_c" builder) "c_mat" builder in
 
           (*L.build_load (build_matrix_access (mat r c e1' e2' builder) "element_ptr" builder)*)
           let index = L.build_add e2' (L.build_mul e1' c "tmp" builder) "index" builder in
-          L.build_gep mat [|index|] "element_ptr" builder
+          L.build_gep mat [|index|] "element_ptr_ptr" builder
         in
-        L.build_load l "element" builder
+        L.build_load idx "element_ptr" builder
 
       | SEmpty     -> L.const_int i32_t 0
-      | SVar s     -> 
-        let ptr = lookup s in
+      | SVar s     -> L.build_load (lookup s) s builder
+       (* let ptr = lookup s in
         (match (is_matrix ptr) with
           | true -> ptr
-          | false -> (L.build_load (ptr) s builder))
+          | false -> (L.build_load (ptr) s builder))*)
 
       | SAssign (s, e) -> 
         let e' = expr builder e in 

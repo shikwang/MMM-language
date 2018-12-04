@@ -1,0 +1,9 @@
+func int main()
+{
+    int a; 
+    a = 11111;
+    print(a);
+    return 0;
+}
+
+
