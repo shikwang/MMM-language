@@ -1,0 +1,8 @@
+func int main()
+{
+    matrix m = [1.1,2.2;3.3,4.4];
+    float a;
+    a = mean(m);
+    printFloat(a);
+    return 0;    
+}

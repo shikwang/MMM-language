@@ -143,7 +143,7 @@ let translate (functions, structs) =
         let f_array_list_ll_array = Array.of_list f_array_list_ll in
         L.const_array (array_t float_t l) f_array_list_ll_array
       *)
-      | SMatrixlit (f_array,(r,c)) -> build_matrix_lit(f_array,(r,c)) builder
+      | SMatrixlit (f_array,(r,c)) -> (build_matrix_lit (f_array,(r,c)) builder)
       | SMataccess (s,e1,e2) ->
         let idx = 
           let e1' = expr builder e1 and e2' = expr builder e2 in
@@ -206,18 +206,19 @@ let translate (functions, structs) =
         | A.Geq     -> L.build_icmp L.Icmp.Sge
         ) e1' e2' "tmp" builder
 
-      (* operator for matrix
+      (* operator for matrix*)
+      (*
       | SBinop ((A.Matrix,_ ) as e1, op, e2) ->
         let e1' = expr builder e1 
         and e2' = expr builder e2 in
         (match op with
-          A.Add ->
+          A.Add -> 
           A.Sub ->
           A.Mult ->
           A.Elemult ->
           A.Elediv ->
         )
-      *)
+        *)
 
       | SUop(op, ((t, _) as e)) ->
         let e' = expr builder e in
@@ -225,6 +226,7 @@ let translate (functions, structs) =
           A.Nega when t = A.Float -> L.build_fneg 
         | A.Nega                  -> L.build_neg
         | A.Not                   -> L.build_not) e' "tmp" builder
+
       | SCall ("print", [e]) ->
 	      L.build_call printf_func [| int_format_str ; (expr builder e) |]
         "printf" builder      
@@ -238,11 +240,60 @@ let translate (functions, structs) =
         L.build_call printf_func [| float_format_str ; (expr builder e) |]
         "printf" builder
       
-      (* print matrix function *)
+      (* print matrix function *) 
         
       | SCall ("height",[e]) ->
         let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
         r
+      
+      | SCall ("width", [e]) ->
+        let c = L.build_load (L.build_struct_gep (expr builder e) 2 "m_c" builder) "c_mat" builder in
+        c
+
+      | SCall ("sum", [e]) ->
+        let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
+        let c = L.build_load (L.build_struct_gep (expr builder e) 2 "m_c" builder) "c_mat" builder in
+        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
+
+        let sum = L.build_alloca float_t "sumOfEle" builder in
+        let total = L.build_sub (L.build_mul r c "tmp" builder) (L.const_int i32_t 1) "index" builder in
+        ignore(L.build_store (L.const_float float_t 0.0) sum builder);
+        (*let total_int = L.const_ptrtoint total i32_t in
+        let total_const_int = L.const_int i32_t total_int in*)
+
+        (*
+        let total_int64opt = L.int64_of_const total in
+        
+        let total_val = match total_int64opt with
+          | Some t -> t
+          | None -> raise(Failure "Fail here")
+        in
+        
+        let t_v = Int64.to_int r_val in *)
+        (for x=0 to 3 do
+          let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t x|] "element_ptr_ptr" builder) in
+          let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+          let tmp_sum = L.build_fadd (L.build_load sum "addsum" builder) ele "tmp_sum" builder in 
+            ignore(L.build_store tmp_sum sum builder);
+        done);
+        L.build_load sum "addsum" builder
+        
+      | SCall ("mean", [e]) ->
+        let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
+        let c = L.build_load (L.build_struct_gep (expr builder e) 2 "m_c" builder) "c_mat" builder in
+        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
+
+        let sum = L.build_alloca float_t "sumOfEle" builder in
+        let total = L.build_sub (L.build_mul r c "tmp" builder) (L.const_int i32_t 1) "index" builder in
+        ignore(L.build_store (L.const_float float_t 0.0) sum builder);
+
+        (for x=0 to 3 do
+          let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t x|] "element_ptr_ptr" builder) in
+          let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+          let tmp_sum = L.build_fadd (L.build_load sum "addsum" builder) ele "tmp_sum" builder in 
+            ignore(L.build_store tmp_sum sum builder);
+        done);
+        L.build_fdiv (L.build_load sum "addsum" builder) (L.const_float float_t 4.0) "mean_sum" builder
 
       | SCall (f, args) -> 
          let (fdef, fdecl) = StringMap.find f function_decls in
