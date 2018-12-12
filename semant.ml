@@ -56,19 +56,27 @@ let check(functions, structures)=
 
   (* Add function declaration for a named function *)
   let built_in_decls =  
-    let add_bind map (name,ty,rty) = StringMap.add name {
-      ftyp = rty;
-      fname = name;
-      formals = [Primdecl(ty,"x")];
-      body = []
-    } map
-    in List.fold_left add_bind StringMap.empty [
-      ("print",Int,Void);("printStr",String,Void);("printFloat",Float,Void);
-      ("height",Matrix,Int);("width",Matrix,Int);
-      ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Void);
-      ("eig",Matrix,Void);("inv",Matrix,Void);("det",Matrix,Void);
-      ("imread",String,Void)
-    ]
+    let bigmap = 
+      let add_bind map (name,ty,rty) = StringMap.add name {
+        ftyp = rty;
+        fname = name;
+        formals = [Primdecl(ty,"x")];
+        body = []
+      } map
+      in List.fold_left add_bind StringMap.empty [
+        ("print",Int,Void);("printStr",String,Void);("printFloat",Float,Void);
+        ("height",Matrix,Int);("width",Matrix,Int);
+        ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Void);
+        ("eig",Matrix,Void);("inv",Matrix,Void);("det",Matrix,Void)
+      ]
+    in bigmap.add "imread"
+      {
+        typ = Void;
+        fname = "imread";
+        formals = [(String,"w"); ((Matrix( Byte , [])), "x") ];
+        locals = [];
+        body = [];
+      }
   in
 
   let function_decls = List.fold_left (

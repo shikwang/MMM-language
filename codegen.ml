@@ -45,6 +45,23 @@ let translate (functions, structs) =
   let printf_t : L.lltype = L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
   let printf_func : L.llvalue = L.declare_function "printf" printf_t the_module in
 
+  let open_t = L.var_arg_function_type i32_t [| L.pointer_type i8_t;i32_t |] in
+  let open_func = L.declare_function "open" open_t the_module in
+
+
+  (* let read_t = L.var_arg_function_type i32_t [| i32_t; L.pointer_type i32_t; i32_t |] in
+  let read_func = L.declare_function "read" read_t the_module in
+  let readbyte_t = L.var_arg_function_type i32_t [| i32_t; L.pointer_type i8_t; i32_t |] in
+  let readbyte_func = L.declare_function "read" readbyte_t the_module in *)
+  let readfl_t = L.var_arg_function_type i32_t [| i32_t; L.pointer_type float_t; i32_t |] in
+  let readfl_func = L.declare_function "read" readfl_t the_module in
+  let creat_t = L.var_arg_function_type i32_t [| L.pointer_type i8_t;i32_t |] in
+  let creat_func = L.declare_function "creat" creat_t the_module in
+  let write_t = L.var_arg_function_type i32_t [| i32_t; L.pointer_type i8_t; i32_t |] in
+  let write_func = L.declare_function "write" write_t the_module in
+  let close_t = L.var_arg_function_type i32_t [| i32_t |] in
+  let close_func = L.declare_function "close" close_t the_module in
+
   (*
   let getHeight_t : L.function_type i32_t [| matrix_t |] in
   let getHeight_func = L.declare_function "height" getHeight_t the_module in 
@@ -237,9 +254,26 @@ let translate (functions, structs) =
       | SCall ("printFloat",[e]) ->
         L.build_call printf_func [| float_format_str ; (expr builder e) |]
         "printf" builder
+
+      | SCall ("open", ([ e ; e2 ])) ->
+              (L.build_call open_func [| expr builder e;expr builder e2|] "open" builder)
       
+      | SCall ("imread", ([ e ])) ->
+        let ev = A.string_of_expr e in
+        (* let arrptr = (lookup ev) in  *)
+        (* need array size  *)
+        let fd = (L.build_call open_func [| ev ; L.const_int i32_t 0|] "open" builder) in
+        let ret = L.build_call readfl_func 
+            [| fd ;
+              (L.build_gep arrptr [|L.const_int i32_t 0;L.const_int i32_t 0|] "tmp" builder);
+                L.const_int i32_t (arrsize*8)|] "read" builder in
+        (ignore (L.build_call close_func [| fd |] "close" builder));ret 
+
+
+
+
       (* print matrix function *)
-        
+
       | SCall ("height",[e]) ->
         let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
         r
