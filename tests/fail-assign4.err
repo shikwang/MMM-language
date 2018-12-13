@@ -1,1 +1,1 @@
-Fatal error: exception Failure("illegal assignment matrix = int in a")
+Fatal error: exception Failure("illegal assignment SMatrix(4, 5) = int in a")

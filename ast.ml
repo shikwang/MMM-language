@@ -3,7 +3,7 @@ type biop = Add | Sub | Mult | Div | Eq | Neq | Less | Leq | Greater | Geq | And
 (*elemult is matrix between int*)
 type uniop = Not | Nega
 
-type datatyp = Int | Float | Boolean | Matrix | String | Void | Struct
+type datatyp = Int | Float | Boolean | Matrix | String | Void | Struct | SMatrix of int * int
 
 type bind = Primdecl of datatyp * string
   | Strudecl of string * string
@@ -25,7 +25,7 @@ type expr =
   | Matslicing of string * expr * expr
   | Empty (*declare variable without assigning value*)
   | Range of index * index
-and index = Beg | End | Ind of expr
+and index = Beg | End | Ind of int
 
 type stmt =
     Block of stmt list
@@ -88,8 +88,8 @@ let rec string_of_expr = function
   | Call(f, el) -> f ^ "(" ^ String.concat ", " (List.map string_of_expr el) ^ ")"
   | Mataccess(m, b, c) -> m ^ "[" ^string_of_expr b^ "][" ^ string_of_expr c ^ "]"
   | Matslicing(m, b, c) -> m ^ "[" ^string_of_expr b^ "][" ^ string_of_expr c ^ "]"
-  | Range(s, e) -> let a = (match s with Beg -> "Beg" | End -> "End" | Ind(e) -> string_of_expr e) and b = 
-                           (match e with Beg -> "Beg" | End -> "End" | Ind(e) -> string_of_expr e) in
+  | Range(s, e) -> let a = (match s with Beg -> "Beg" | End -> "End" | Ind(e) -> string_of_int e) and b = 
+                           (match e with Beg -> "Beg" | End -> "End" | Ind(e) -> string_of_int e) in
                            a ^ " : " ^ b
   | Empty -> ""
   | _ -> ""
@@ -101,6 +101,8 @@ let string_of_datatyp = function
   | Float -> "float"
   | Matrix -> "matrix"
   | String -> "string"
+  | Struct -> "struct"
+  | SMatrix(a,b) -> "SMatrix(" ^ string_of_int a ^ ", " ^ string_of_int b ^ ")"
   | _ -> ""
 
 let rec string_of_stmt = function

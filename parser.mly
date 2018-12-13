@@ -145,9 +145,8 @@ expr:
   | NOT expr { Uop(Not, $2) }
   | expr ASSIGN expr { Assign($1, $3) }
   | ID LBRACK expr RBRACK LBRACK expr RBRACK { match $3, $6 with
-                                                   Range(_,_), c -> (match c with Range(_,_) -> Matslicing($1, $3, c)
-                                                                       | _ -> Matslicing($1, $3, Range(Ind(c),Ind(c))))
-                                                 | r, Range(_,_) -> Matslicing($1, Range(Ind(r),Ind(r)), $6)
+                                                   Range(_,_), c -> Matslicing($1, $3, c)
+                                                 | r, Range(_,_) -> Matslicing($1, r, $6)
                                                  | a, b -> Mataccess($1, a, b)
                                                  | _ -> failwith("wrong indexing expression")}
   | ID LPARE expr_opt RPARE { let inputs = match $3 with
@@ -155,9 +154,9 @@ expr:
                                            | Empty -> []
                                            | _ -> [$3] in Call($1, inputs)}
   | LPARE expr RPARE { $2 }
-  | expr COL { Range(Ind($1), End) }
-  | expr COL expr { Range(Ind($1), Ind($3)) }
-  | COL expr { Range(Beg, Ind($2)) }
+  | INT_LITERAL COL { Range(Ind($1), End) }
+  | INT_LITERAL COL INT_LITERAL { Range(Ind($1), Ind($3)) }
+  | COL INT_LITERAL { Range(Beg, Ind($2)) }
   | COL { Range(Beg, End) }
 
 mat_literal: 
