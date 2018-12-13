@@ -2,6 +2,8 @@
 
 open Ast
 
+module StringMap = Map.Make(String)
+
 type sexpr = datatyp * sx
 and sx =
     SIntlit of int
@@ -38,6 +40,7 @@ type sfunc_decl = {
     sfname : string;
     sformals : bind list;
     slocals : bind list;
+    smatsiz: (int * int) StringMap.t;
     sbody : sstmt list;
   }
 

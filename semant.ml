@@ -5,8 +5,6 @@ open Sast
 
    Check each struct, then check each function *)
 
-module StringMap = Map.Make(String)
-
 let check(functions, structures)=
   (* Raise an exception if the given list has a duplicate *)
   let report_duplicate except list =
@@ -335,6 +333,7 @@ let check(functions, structures)=
         sfname = func.fname;
         sformals = func.formals;
         slocals = List.map (fun (v,ty) -> Primdecl(ty,v)) (StringMap.bindings symbols);
+        smatsiz = matrixsize;
         sbody = match check_stmt (Block func.body) with
         SBlock(sl) -> sl
         | _ -> raise (Failure ("internal error: block didn't become a block?"))
