@@ -4,5 +4,6 @@ func matrix Foo(){
 }
 
 func void main(){
-    matrix a = Bar();   /* this should fail because unrecognized func */
+    matrix a[3, 3];
+    a = Bar();   /* this should fail because unrecognized func */
 }

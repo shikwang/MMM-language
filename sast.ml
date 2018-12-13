@@ -22,7 +22,7 @@ and sx =
   | SMatslicing of string * sexpr * sexpr
   | SEmpty (*declare variable without assigning value*)
   | SRange of sindex * sindex
-and sindex = SBeg | SEnd | SInd of sexpr
+and sindex = SBeg | SEnd | SInd of int
 
 type sstmt =
     SBlock of sstmt list
@@ -40,7 +40,7 @@ type sfunc_decl = {
     sfname : string;
     sformals : bind list;
     slocals : bind list;
-    smatsiz: (int * int) StringMap.t;
+    smatsiz: (string * (int * int)) list;
     sbody : sstmt list;
   }
 
@@ -67,8 +67,8 @@ let rec string_of_sexpr = function
   | (_, SCall(f, el)) -> f ^ "(" ^ String.concat ", " (List.map string_of_sexpr el) ^ ")"
   | (_, SMataccess(m, b, c)) -> m ^ "[" ^string_of_sexpr b^ "][" ^ string_of_sexpr c ^ "]"
   | (_, SMatslicing(m, b, c)) -> m ^ "[" ^string_of_sexpr b^ "][" ^ string_of_sexpr c ^ "]"
-  | (_, SRange(s, e)) -> let a = (match s with SBeg -> "SBeg" | SEnd -> "SEnd" | SInd(e) -> string_of_sexpr e) and b = 
-                         (match e with SBeg -> "SBeg" | SEnd -> "SEnd" | SInd(e) -> string_of_sexpr e) in
+  | (_, SRange(s, e)) -> let a = (match s with SBeg -> "SBeg" | SEnd -> "SEnd" | SInd(e) -> string_of_int e) and b = 
+                         (match e with SBeg -> "SBeg" | SEnd -> "SEnd" | SInd(e) -> string_of_int e) in
                          a ^ " : " ^ b
   | (_, SEmpty) -> ""
   | _ -> ""

@@ -4,6 +4,7 @@ func matrix Foo(){
 }
 
 func void main(){
-    matrix b = Foo();
+    matrix b[3,3];
+    b = Foo();
     int c = b[1.1][1.2];
 }
