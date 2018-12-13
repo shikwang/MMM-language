@@ -1,4 +1,0 @@
-func int main(){
-    printStr("aaa");
-    return 0;
-}

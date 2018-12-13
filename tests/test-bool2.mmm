@@ -1,0 +1,7 @@
+func int main(){
+    bool a = false;
+    if(a == false){
+        print(100);
+    }
+    return 0;
+}
