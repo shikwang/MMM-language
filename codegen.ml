@@ -25,7 +25,7 @@ let translate (functions, structs) =
   let matrix_t = L.named_struct_type context "matrix_t" in 
     L.struct_set_body matrix_t [|L.pointer_type float_t; i32_t; i32_t|] false;
 
-  let matrixptr_t = L.pointer_type matrix_t in
+  (*let matrixptr_t = L.pointer_type matrix_t in*)
 
   (* Return the LLVM type for a MicroC type *)
   (* To do : matrix and struct *)
@@ -38,7 +38,7 @@ let translate (functions, structs) =
       (*
       | A.Matrix -> array_t float_t 4 (*the int must be equal to total size of the matrix*)
       *)
-      | A.Matrix -> matrixptr_t
+      | A.Matrix -> L.pointer_type matrix_t
   in
 
   (* function types *)
@@ -135,7 +135,7 @@ let translate (functions, structs) =
       let m_mat = L.build_struct_gep m 0 "m_mat" builder in ignore(L.build_store mat m_mat builder);
       let m_r = L.build_struct_gep m 1 "m_r" builder in ignore(L.build_store (L.const_int i32_t r) m_r builder);
       let m_c = L.build_struct_gep m 2 "m_c" builder in ignore(L.build_store (L.const_int i32_t c) m_c builder);
-      L.build_pointercast m matrixptr_t "m" builder
+      m (*L.build_pointercast m matrixptr_t "m" builder*)
     in
 
     let is_matrix ptr = 
@@ -160,27 +160,27 @@ let translate (functions, structs) =
         let f_array_list_ll_array = Array.of_list f_array_list_ll in
         L.const_array (array_t float_t l) f_array_list_ll_array
       *)
-      | SMatrixlit (f_array,(r,c)) -> build_matrix_lit(f_array,(r,c)) builder
+      | SMatrixlit (f_array,(r,c)) -> (build_matrix_lit (f_array,(r,c)) builder)
       | SMataccess (s,e1,e2) ->
-        let l = 
+        let idx = 
           let e1' = expr builder e1 and e2' = expr builder e2 in
-          let ptr = lookup s in
-          let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat_mat" builder in
+          let ptr = L.build_load (lookup s) s builder in
+          let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
           let r = L.build_load (L.build_struct_gep ptr 1 "m_r" builder) "r_mat" builder in
           let c = L.build_load (L.build_struct_gep ptr 2 "m_c" builder) "c_mat" builder in
 
           (*L.build_load (build_matrix_access (mat r c e1' e2' builder) "element_ptr" builder)*)
           let index = L.build_add e2' (L.build_mul e1' c "tmp" builder) "index" builder in
-          L.build_gep mat [|index|] "element_ptr" builder
+          L.build_gep mat [|index|] "element_ptr_ptr" builder
         in
-        L.build_load l "element" builder
+        L.build_load idx "element_ptr" builder
 
       | SEmpty     -> L.const_int i32_t 0
-      | SVar s     -> 
-        let ptr = lookup s in
+      | SVar s     -> L.build_load (lookup s) s builder
+       (* let ptr = lookup s in
         (match (is_matrix ptr) with
           | true -> ptr
-          | false -> (L.build_load (ptr) s builder))
+          | false -> (L.build_load (ptr) s builder))*)
 
       | SAssign (s, e) -> 
         let e' = expr builder e in 
@@ -223,18 +223,19 @@ let translate (functions, structs) =
         | A.Geq     -> L.build_icmp L.Icmp.Sge
         ) e1' e2' "tmp" builder
 
-      (* operator for matrix
+      (* operator for matrix*)
+      (*
       | SBinop ((A.Matrix,_ ) as e1, op, e2) ->
         let e1' = expr builder e1 
         and e2' = expr builder e2 in
         (match op with
-          A.Add ->
+          A.Add -> 
           A.Sub ->
           A.Mult ->
           A.Elemult ->
           A.Elediv ->
         )
-      *)
+        *)
 
       | SUop(op, ((t, _) as e)) ->
         let e' = expr builder e in
@@ -242,6 +243,7 @@ let translate (functions, structs) =
           A.Nega when t = A.Float -> L.build_fneg 
         | A.Nega                  -> L.build_neg
         | A.Not                   -> L.build_not) e' "tmp" builder
+
       | SCall ("print", [e]) ->
 	      L.build_call printf_func [| int_format_str ; (expr builder e) |]
         "printf" builder      
@@ -258,7 +260,7 @@ let translate (functions, structs) =
       | SCall ("open", ([ e ; e2 ])) ->
               (L.build_call open_func [| expr builder e;expr builder e2|] "open" builder)
       
-      | SCall ("imread", ([ e ])) ->
+      (* | SCall ("imread", ([ e ])) ->
         let ev = A.string_of_expr e in
         (* let arrptr = (lookup ev) in  *)
         (* need array size  *)
@@ -269,14 +271,64 @@ let translate (functions, structs) =
                 L.const_int i32_t (arrsize*8)|] "read" builder in
         (ignore (L.build_call close_func [| fd |] "close" builder));ret 
 
-
+ *)
 
 
       (* print matrix function *)
 
+
       | SCall ("height",[e]) ->
         let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
         r
+      
+      | SCall ("width", [e]) ->
+        let c = L.build_load (L.build_struct_gep (expr builder e) 2 "m_c" builder) "c_mat" builder in
+        c
+
+      | SCall ("sum", [e]) ->
+        let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
+        let c = L.build_load (L.build_struct_gep (expr builder e) 2 "m_c" builder) "c_mat" builder in
+        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
+
+        let sum = L.build_alloca float_t "sumOfEle" builder in
+        let total = L.build_sub (L.build_mul r c "tmp" builder) (L.const_int i32_t 1) "index" builder in
+        ignore(L.build_store (L.const_float float_t 0.0) sum builder);
+        (*let total_int = L.const_ptrtoint total i32_t in
+        let total_const_int = L.const_int i32_t total_int in*)
+
+        (*
+        let total_int64opt = L.int64_of_const total in
+        
+        let total_val = match total_int64opt with
+          | Some t -> t
+          | None -> raise(Failure "Fail here")
+        in
+        
+        let t_v = Int64.to_int r_val in *)
+        (for x=0 to 3 do
+          let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t x|] "element_ptr_ptr" builder) in
+          let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+          let tmp_sum = L.build_fadd (L.build_load sum "addsum" builder) ele "tmp_sum" builder in 
+            ignore(L.build_store tmp_sum sum builder);
+        done);
+        L.build_load sum "addsum" builder
+        
+      | SCall ("mean", [e]) ->
+        let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
+        let c = L.build_load (L.build_struct_gep (expr builder e) 2 "m_c" builder) "c_mat" builder in
+        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
+
+        let sum = L.build_alloca float_t "sumOfEle" builder in
+        let total = L.build_sub (L.build_mul r c "tmp" builder) (L.const_int i32_t 1) "index" builder in
+        ignore(L.build_store (L.const_float float_t 0.0) sum builder);
+
+        (for x=0 to 3 do
+          let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t x|] "element_ptr_ptr" builder) in
+          let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+          let tmp_sum = L.build_fadd (L.build_load sum "addsum" builder) ele "tmp_sum" builder in 
+            ignore(L.build_store tmp_sum sum builder);
+        done);
+        L.build_fdiv (L.build_load sum "addsum" builder) (L.const_float float_t 4.0) "mean_sum" builder
 
       | SCall (f, args) -> 
          let (fdef, fdecl) = StringMap.find f function_decls in
