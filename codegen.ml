@@ -260,8 +260,9 @@ let translate (functions, structs) =
       | SCall ("open", ([ e ; e2 ])) ->
               (L.build_call open_func [| expr builder e;expr builder e2|] "open" builder)
       
-      (* | SCall ("imread", ([ e ])) ->
-        let ev = A.string_of_expr e in
+      (* | SCall ("imread", ([e; e2 ])) ->
+        let e' = expr builder e in
+        let e2' = expr builder e in 
         (* let arrptr = (lookup ev) in  *)
         (* need array size  *)
         let fd = (L.build_call open_func [| ev ; L.const_int i32_t 0|] "open" builder) in
@@ -269,9 +270,9 @@ let translate (functions, structs) =
             [| fd ;
               (L.build_gep arrptr [|L.const_int i32_t 0;L.const_int i32_t 0|] "tmp" builder);
                 L.const_int i32_t (arrsize*8)|] "read" builder in
-        (ignore (L.build_call close_func [| fd |] "close" builder));ret 
+        (ignore (L.build_call close_func [| fd |] "close" builder));ret  *)
 
- *)
+
 
 
       (* print matrix function *)
