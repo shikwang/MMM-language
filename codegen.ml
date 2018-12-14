@@ -123,6 +123,11 @@ let translate (functions, structs) =
     let lookup n = StringMap.find n local_vars 
     in
 
+    let lookup_size n = match n with
+      | (A.SMatrix (r,c),_) -> (r,c)
+      | _ -> (0,0)
+    in
+
     (*the function builds the matrixlit*)
     let build_matrix_lit(f_array,(r,c)) builder =
       let mat = L.build_array_malloc float_t (L.const_int i32_t (r*c)) "system_mat" builder in
@@ -138,11 +143,82 @@ let translate (functions, structs) =
       m (*L.build_pointercast m matrixptr_t "m" builder*)
     in
 
+    let build_default_mat (r,c) builder = 
+      let mat = L.build_array_malloc float_t (L.const_int i32_t (r*c)) "system_mat" builder in
+      (*try cast pointer*)
+      (for x = 0 to (r*c-1) do
+        let element_ptr = L.build_gep mat [|(L.const_int i32_t x)|] "element_ptr" builder in 
+        ignore(L.build_store (L.const_float float_t 0.0) element_ptr builder)
+      done);
+      let m = L.build_malloc matrix_t "m" builder in
+      let m_mat = L.build_struct_gep m 0 "m_mat" builder in ignore(L.build_store mat m_mat builder);
+      let m_r = L.build_struct_gep m 1 "m_r" builder in ignore(L.build_store (L.const_int i32_t r) m_r builder);
+      let m_c = L.build_struct_gep m 2 "m_c" builder in ignore(L.build_store (L.const_int i32_t c) m_c builder);
+      m (*L.build_pointercast m matrixptr_t "m" builder*)
+    in
+
     let is_matrix ptr = 
       let ltype_string = L.string_of_lltype (L.type_of ptr) in
       match ltype_string with
         "%matrix_t*" -> true
       | _ -> false
+    in
+
+    let mat_mat_operation m1 m2 r1 c1 r2 c2 op if_elewise builder =
+      match if_elewise with 
+      | "yes" ->        
+        let mat1 = L.build_load (L.build_struct_gep m1 0 "m_mat" builder) "mat1" builder in
+        let mat2 = L.build_load (L.build_struct_gep m2 0 "m_mat" builder) "mat2" builder in
+        let res_mat = build_default_mat (r1,c1) builder in (* Change the r and c size here *)
+        let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+
+        (for i = 0 to r1*c1-1 do
+          let m1_ele_ptr_ptr = L.build_gep mat1 [|L.const_int i32_t i|] "element_ptr_ptr" builder in
+          let m1_ele_ptr = L.build_load m1_ele_ptr_ptr "element_ptr" builder in
+
+          let m2_ele_ptr_ptr = L.build_gep mat2 [|L.const_int i32_t i|] "element_ptr_ptr" builder in
+          let m2_ele_ptr = L.build_load m2_ele_ptr_ptr "element_ptr" builder in
+
+          let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
+          let res_ptr = L.build_load res_ptr_ptr "res_ptr" builder in
+
+          let tmp_ele = op m1_ele_ptr m2_ele_ptr "tmp_ele" builder in ignore(L.build_store tmp_ele res_ptr_ptr builder)
+        done); res_mat
+      | "not" -> 
+        let mat1 = L.build_load (L.build_struct_gep m1 0 "m_mat" builder) "mat1" builder in
+        let mat2 = L.build_load (L.build_struct_gep m2 0 "m_mat" builder) "mat2" builder in
+        let res_mat = build_default_mat (r1,c2) builder in
+        let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+
+        (for i = 0 to r1-1 do
+          (for j = 0 to c2-1 do
+            let idx = (i*c2+j) in
+            let res_ptr_ptr = L.build_gep res [|L.const_int i32_t idx|] "res_ptr_ptr" builder in
+            let res_ptr = L.build_load res_ptr_ptr "res_ptr" builder in
+
+            let tmp_sum = L.build_alloca float_t "tmp_sum" builder in
+
+            let x = ref (i*c1) in
+            let y = ref j in
+            (while !y<(r2*c2) do
+              let m1_ele_ptr_ptr = L.build_gep mat1 [|L.const_int i32_t !x|] "element_ptr_ptr" builder in
+              let m1_ele_ptr = L.build_load m1_ele_ptr_ptr "element_ptr" builder in
+
+              let m2_ele_ptr_ptr = L.build_gep mat2 [|L.const_int i32_t !y|] "element_ptr_ptr" builder in
+              let m2_ele_ptr = L.build_load m2_ele_ptr_ptr "element_ptr" builder in
+              
+              let tmp = L.build_fmul m1_ele_ptr m2_ele_ptr "tmp_ele" builder in
+
+              let new_sum = L.build_fadd (L.build_load tmp_sum "addsum" builder) tmp "new_sum" builder in 
+                ignore(L.build_store new_sum tmp_sum builder);
+              x := (!x+1);
+              y := (!y+c2);
+            done);
+            
+            ignore(L.build_store (L.build_load tmp_sum "tmp" builder) res_ptr_ptr builder);
+          done);
+        done);
+        res_mat
     in
 
     (* Construct code for an expression; return its value *)
@@ -186,56 +262,63 @@ let translate (functions, structs) =
         let e' = expr builder e in 
           (match s with 
             | (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
-            | _ -> raise (Failure "Assign Failiure!"))              
-      | SBinop ((A.Float,_ ) as e1, op, e2) ->
-        let e1' = expr builder e1
-        and e2' = expr builder e2 in
-        (match op with 
-          A.Add     -> L.build_fadd
-        | A.Sub     -> L.build_fsub
-        | A.Mult    -> L.build_fmul
-        | A.Div     -> L.build_fdiv 
-        | A.Eq      -> L.build_fcmp L.Fcmp.Oeq
-        | A.Neq     -> L.build_fcmp L.Fcmp.One
-        | A.Less    -> L.build_fcmp L.Fcmp.Olt
-        | A.Leq     -> L.build_fcmp L.Fcmp.Ole
-        | A.Greater -> L.build_fcmp L.Fcmp.Ogt
-        | A.Geq     -> L.build_fcmp L.Fcmp.Oge
-        | A.And | A.Or ->
-            raise (Failure "internal error: semant should have rejected and/or on float")
-        ) e1' e2' "tmp" builder
-        
-      | SBinop (e1, op, e2) ->
-        let e1' = expr builder e1
-        and e2' = expr builder e2 in
-        (match op with
-          A.Add     -> L.build_add
-        | A.Sub     -> L.build_sub
-        | A.Mult    -> L.build_mul
-        | A.Div     -> L.build_sdiv
-        | A.And     -> L.build_and
-        | A.Or      -> L.build_or
-        | A.Eq      -> L.build_icmp L.Icmp.Eq
-        | A.Neq     -> L.build_icmp L.Icmp.Ne
-        | A.Less    -> L.build_icmp L.Icmp.Slt
-        | A.Leq     -> L.build_icmp L.Icmp.Sle
-        | A.Greater -> L.build_icmp L.Icmp.Sgt
-        | A.Geq     -> L.build_icmp L.Icmp.Sge
-        ) e1' e2' "tmp" builder
+            | _ -> raise (Failure "Assign Failiure!"))
 
-      (* operator for matrix*)
-      (*
-      | SBinop ((A.Matrix,_ ) as e1, op, e2) ->
-        let e1' = expr builder e1 
-        and e2' = expr builder e2 in
-        (match op with
-          A.Add -> 
-          A.Sub ->
-          A.Mult ->
-          A.Elemult ->
-          A.Elediv ->
-        )
-        *)
+      | SBinop (e1, op, e2) ->
+      (let c1 = expr builder e1 in
+      let c2 = expr builder e2 in
+
+      let check1 = is_matrix c1 in
+      let check2 = is_matrix c2 in
+      match (check1,check2) with
+        | (false,false) ->
+          (match e1 with
+            | (A.Float,_) ->
+              let e1' = expr builder e1
+              and e2' = expr builder e2 in
+              (match op with 
+                A.Add     -> L.build_fadd
+              | A.Sub     -> L.build_fsub
+              | A.Mult    -> L.build_fmul
+              | A.Div     -> L.build_fdiv 
+              | A.Eq      -> L.build_fcmp L.Fcmp.Oeq
+              | A.Neq     -> L.build_fcmp L.Fcmp.One
+              | A.Less    -> L.build_fcmp L.Fcmp.Olt
+              | A.Leq     -> L.build_fcmp L.Fcmp.Ole
+              | A.Greater -> L.build_fcmp L.Fcmp.Ogt
+              | A.Geq     -> L.build_fcmp L.Fcmp.Oge
+              | A.And | A.Or ->
+                  raise (Failure "internal error: semant should have rejected and/or on float")
+              ) e1' e2' "tmp" builder
+            | _ ->
+              let e1' = expr builder e1
+              and e2' = expr builder e2 in
+              (match op with
+                A.Add     -> L.build_add
+              | A.Sub     -> L.build_sub
+              | A.Mult    -> L.build_mul
+              | A.Div     -> L.build_sdiv
+              | A.And     -> L.build_and
+              | A.Or      -> L.build_or
+              | A.Eq      -> L.build_icmp L.Icmp.Eq
+              | A.Neq     -> L.build_icmp L.Icmp.Ne
+              | A.Less    -> L.build_icmp L.Icmp.Slt
+              | A.Leq     -> L.build_icmp L.Icmp.Sle
+              | A.Greater -> L.build_icmp L.Icmp.Sgt
+              | A.Geq     -> L.build_icmp L.Icmp.Sge
+              ) e1' e2' "tmp" builder)
+        | (true,true) ->
+          let (r1,c1) = lookup_size e1 in
+          let (r2,c2) = lookup_size e2 in
+          let e1' = expr builder e1 and e2' = expr builder e2 in
+          (match op with
+              A.Add -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fadd "yes" builder
+            | A.Sub -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fsub "yes" builder
+            | A.Mult -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fmul "not" builder
+            | A.Elemult -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fmul "yes" builder
+            | A.Elediv -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fdiv "yes" builder
+          )
+      )
 
       | SUop(op, ((t, _) as e)) ->
         let e' = expr builder e in
@@ -287,13 +370,10 @@ let translate (functions, structs) =
         c
 
       | SCall ("sum", [e]) ->
-        let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
-        let c = L.build_load (L.build_struct_gep (expr builder e) 2 "m_c" builder) "c_mat" builder in
+        let (r,c) = lookup_size e in
         let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
 
         let sum = L.build_alloca float_t "sumOfEle" builder in
-        let total = L.build_sub (L.build_mul r c "tmp" builder) (L.const_int i32_t 1) "index" builder in
-        ignore(L.build_store (L.const_float float_t 0.0) sum builder);
         (*let total_int = L.const_ptrtoint total i32_t in
         let total_const_int = L.const_int i32_t total_int in*)
 
@@ -306,7 +386,7 @@ let translate (functions, structs) =
         in
         
         let t_v = Int64.to_int r_val in *)
-        (for x=0 to 3 do
+        (for x=0 to r*c-1 do
           let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t x|] "element_ptr_ptr" builder) in
           let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
           let tmp_sum = L.build_fadd (L.build_load sum "addsum" builder) ele "tmp_sum" builder in 
@@ -315,15 +395,11 @@ let translate (functions, structs) =
         L.build_load sum "addsum" builder
         
       | SCall ("mean", [e]) ->
-        let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
-        let c = L.build_load (L.build_struct_gep (expr builder e) 2 "m_c" builder) "c_mat" builder in
+        let (r,c) = lookup_size e in
         let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
 
         let sum = L.build_alloca float_t "sumOfEle" builder in
-        let total = L.build_sub (L.build_mul r c "tmp" builder) (L.const_int i32_t 1) "index" builder in
-        ignore(L.build_store (L.const_float float_t 0.0) sum builder);
-
-        (for x=0 to 3 do
+        (for x=0 to r*c-1 do
           let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t x|] "element_ptr_ptr" builder) in
           let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
           let tmp_sum = L.build_fadd (L.build_load sum "addsum" builder) ele "tmp_sum" builder in 
@@ -401,6 +477,7 @@ let translate (functions, structs) =
                                         (_, SEmpty) -> builder 
                                       | _ -> let e' = expr builder e in
                                              (ignore(L.build_store e' (lookup name) builder); builder))
+      | SDefaultmat (name, r, c) -> (L.build_store (build_default_mat (r,c) builder) (lookup name) builder);builder
     in
 
     (* Build the code for each statement in the function *)
