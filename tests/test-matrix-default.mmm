@@ -1,0 +1,8 @@
+func int main()
+{
+    matrix m[2,3];
+    float a;
+    a = sum(m);
+    printFloat(a);
+    return 0;    
+}
