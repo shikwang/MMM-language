@@ -1,0 +1,5 @@
+func int main(){
+    
+    printStr("hello world");
+    return 0;
+}

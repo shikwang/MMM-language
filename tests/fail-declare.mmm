@@ -1,4 +1,5 @@
 func int main(){
-    printStr("aaa");
+    int a = 3;
+    int a = 5;
     return 0;
 }

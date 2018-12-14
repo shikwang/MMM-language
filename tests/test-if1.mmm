@@ -1,0 +1,16 @@
+func int main(){
+    bool a = true;
+    if(a) {
+        print(1);
+    }
+    else {
+        print(0);
+    }
+    bool b = false;
+    if(b) {
+        print(0);
+    }
+    else {
+        print(1);
+    }
+}

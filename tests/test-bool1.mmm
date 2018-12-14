@@ -1,0 +1,6 @@
+func int main(){
+    if(true){
+        print(100);
+    }
+    return 0;
+}

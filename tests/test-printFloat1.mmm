@@ -1,0 +1,6 @@
+func int main()
+{
+    printFloat(6.66);
+    return 0;    
+
+}

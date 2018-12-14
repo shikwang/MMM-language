@@ -57,21 +57,31 @@ let check(functions, structures)=
   in report_built_in_duplicate (List.map (fun fd -> fd.fname) functions);
 
   (* Add function declaration for a named function *)
-  let built_in_decls =  
-    let add_bind map (name,ty,rty) = StringMap.add name {
-      ftyp = rty;
-      fname = name;
-      formals = [Primdecl(ty,"x")];
-      body = []
-    } map
-    in List.fold_left add_bind StringMap.empty [
-      ("print",Int,Void);("printStr",String,Void);("printFloat",Float,Void);
-      ("height",Matrix,Int);("width",Matrix,Int);
-      ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Void);
-      ("eig",Matrix,Void);("inv",Matrix,Void);("det",Matrix,Void);
-      ("imread",String,Void)
-    ]
+  let built_in_decls =   
+    (* define add name and {func} to map *)
+    let part_built_indecls = 
+      let add_bind map (name,ty,rty) = StringMap.add name {
+        ftyp = rty;
+        fname = name;
+        formals = [Primdecl(ty,"x")];
+        body = []
+      } map
+        (* actually add func to map *)
+      in List.fold_left add_bind StringMap.empty [
+        ("print",Int,Void);("printStr",String,Void);("printFloat",Float,Void);
+        ("height",Matrix,Int);("width",Matrix,Int);
+        ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Void);
+        ("eig",Matrix,Void);("inv",Matrix,Void);("det",Matrix,Void)
+      ]
+    in StringMap.add "imread"   
+      {
+        ftyp = Void;
+        fname = "imread";
+        formals = [Primdecl(String,"x"); Primdecl(Matrix,"m")];
+        body = [];
+      } part_built_indecls
   in
+  
 
   let function_decls = List.fold_left (
     fun m fd -> StringMap.add fd.fname fd m)
