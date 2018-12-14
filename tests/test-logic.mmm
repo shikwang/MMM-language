@@ -1,0 +1,15 @@
+func int main() {
+    if (true && true) {
+        print(1);
+    }
+    if (false && true) {
+        print(0);
+    }
+    if (true || false) {
+        print(1);
+    }
+    if (!false) {
+        print(0);
+    }
+    return 0;
+}

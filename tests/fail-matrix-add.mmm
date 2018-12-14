@@ -1,0 +1,6 @@
+func int main() {
+    matrix a = [1.1,2.3];
+    matrix b = [1.1];
+    a+b;
+    return 0;
+}
