@@ -357,9 +357,6 @@ let translate (functions, structs) =
  *)
 
 
-      (* print matrix function *)
-
-
       | SCall ("height",[e]) ->
         let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
         r
@@ -373,18 +370,6 @@ let translate (functions, structs) =
         let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
 
         let sum = L.build_alloca float_t "sumOfEle" builder in
-        (*let total_int = L.const_ptrtoint total i32_t in
-        let total_const_int = L.const_int i32_t total_int in*)
-
-        (*
-        let total_int64opt = L.int64_of_const total in
-        
-        let total_val = match total_int64opt with
-          | Some t -> t
-          | None -> raise(Failure "Fail here")
-        in
-        
-        let t_v = Int64.to_int r_val in *)
         (for x=0 to r*c-1 do
           let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t x|] "element_ptr_ptr" builder) in
           let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
@@ -405,6 +390,69 @@ let translate (functions, structs) =
             ignore(L.build_store tmp_sum sum builder);
         done);
         L.build_fdiv (L.build_load sum "addsum" builder) (L.const_float float_t 4.0) "mean_sum" builder
+
+      | SCall ("inv", [e]) ->
+        let (r,c) = lookup_size e in
+        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
+        let res_mat = build_default_mat (c,r) builder in
+        let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+        
+        (for i = 0 to r-1 do
+          (for j = 0 to c-1 do
+            let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t (i*c+j)|] "element_ptr_ptr" builder) in
+            let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+
+            let res_ptr_ptr = L.build_gep res [|L.const_int i32_t (j*r+i)|] "res_ptr_ptr" builder in
+            ignore(L.build_store ele res_ptr_ptr builder)
+          done);
+        done);
+        res_mat
+      
+      | SCall ("cov", [e1;e2]) ->
+        let (r1,c1) = lookup_size e1 in
+        let (r2,c2) = lookup_size e2 in
+        let d = (r2-1)/2 in
+        let mat1 = L.build_load (L.build_struct_gep (expr builder e1) 0 "m_mat" builder) "mat_mat" builder in
+        let mat2 = L.build_load (L.build_struct_gep (expr builder e2) 0 "m_mat" builder) "mat_mat" builder in
+        let res_mat = build_default_mat (r1,c1) builder in
+        let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+
+        let tmp_mat = build_default_mat (r1+2,c1+2) builder in
+        let tmp = L.build_load (L.build_struct_gep tmp_mat 0 "m_mat" builder) "mat" builder in
+
+        (for i=0 to (r1+d) do
+          (for j=0 to (c1+d) do
+            let ele = 
+              (if (((i-d)<0) || ((j-d)<0) || ((i+d)>(r1+d)) || ((j+d)>(c1+d))) then (L.const_float float_t 0.0)
+              else (let ele_ptr_ptr = (L.build_gep mat1 [|L.const_int i32_t ((i-d)*c1+j-d)|] "element_ptr_ptr" builder) in
+                    L.build_load ele_ptr_ptr "element_ptr" builder))
+            in 
+            let tmp_ptr_ptr = L.build_gep tmp [|L.const_int i32_t (i*(c1+2*d)+j)|] "tmp_ptr_ptr" builder in
+            ignore(L.build_store ele tmp_ptr_ptr builder)
+          done);
+        done);
+        
+        (for i=d to r1 do
+          (for j=d to c1 do
+            let res_val_tmp = L.build_alloca float_t "sumOfEle" builder in
+            let ptr = ref 0 in
+            (for x=(i-d) to (i+d) do
+              (for y=(j-d) to (j+d) do
+                let mat2_ele_ptr_ptr = (L.build_gep mat2 [|L.const_int i32_t !ptr|] "mat2_ele_ptr_ptr" builder) in
+                let mat2_ele = L.build_load mat2_ele_ptr_ptr "mat2_ele_ptr" builder in
+                let tmp_ele_ptr_ptr = (L.build_gep tmp [|L.const_int i32_t (x*(c1+2*d)+y)|] "mat2_ele_ptr_ptr" builder) in
+                let tmp_ele = L.build_load tmp_ele_ptr_ptr "tmp_ele_ptr" builder in
+
+                let tmp_res = L.build_fadd (L.build_fmul mat2_ele tmp_ele "tmp_res" builder) 
+                                           (L.build_load res_val_tmp "addres" builder) "new_res" builder in
+                                           ignore(L.build_store tmp_res res_val_tmp builder);
+                ptr := !ptr+1;
+              done);
+            done);
+            ignore(L.build_store (L.build_load res_val_tmp "res" builder) 
+                  (L.build_gep res [|L.const_int i32_t ((i-d)*(c1)+j-d)|] "tmp_ptr_ptr" builder) builder)
+          done);
+        done); res_mat
 
       | SCall (f, args) -> 
          let (fdef, fdecl) = StringMap.find f function_decls in

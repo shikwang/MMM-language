@@ -1,0 +1,328 @@
+/usr/local/Cellar/llvm/7.0.0/bin/lli
+
+###### Testing test-binop
+./mmm.native tests/test-binop.mmm > test-binop.ll
+llc -relocation-model=pic test-binop.ll > test-binop.s
+cc -o test-binop.exe test-binop.s
+./test-binop.exe
+diff -b test-binop.out tests/test-binop.out > test-binop.diff
+###### SUCCESS
+
+###### Testing test-bool1
+./mmm.native tests/test-bool1.mmm > test-bool1.ll
+llc -relocation-model=pic test-bool1.ll > test-bool1.s
+cc -o test-bool1.exe test-bool1.s
+./test-bool1.exe
+diff -b test-bool1.out tests/test-bool1.out > test-bool1.diff
+###### SUCCESS
+
+###### Testing test-bool2
+./mmm.native tests/test-bool2.mmm > test-bool2.ll
+llc -relocation-model=pic test-bool2.ll > test-bool2.s
+cc -o test-bool2.exe test-bool2.s
+./test-bool2.exe
+diff -b test-bool2.out tests/test-bool2.out > test-bool2.diff
+###### SUCCESS
+
+###### Testing test-comparator
+./mmm.native tests/test-comparator.mmm > test-comparator.ll
+llc -relocation-model=pic test-comparator.ll > test-comparator.s
+cc -o test-comparator.exe test-comparator.s
+./test-comparator.exe
+diff -b test-comparator.out tests/test-comparator.out > test-comparator.diff
+###### SUCCESS
+
+###### Testing test-floatAssign1
+./mmm.native tests/test-floatAssign1.mmm > test-floatAssign1.ll
+llc -relocation-model=pic test-floatAssign1.ll > test-floatAssign1.s
+cc -o test-floatAssign1.exe test-floatAssign1.s
+./test-floatAssign1.exe
+diff -b test-floatAssign1.out tests/test-floatAssign1.out > test-floatAssign1.diff
+###### SUCCESS
+
+###### Testing test-for1
+./mmm.native tests/test-for1.mmm > test-for1.ll
+llc -relocation-model=pic test-for1.ll > test-for1.s
+cc -o test-for1.exe test-for1.s
+./test-for1.exe
+diff -b test-for1.out tests/test-for1.out > test-for1.diff
+###### SUCCESS
+
+###### Testing test-functionCall
+./mmm.native tests/test-functionCall.mmm > test-functionCall.ll
+llc -relocation-model=pic test-functionCall.ll > test-functionCall.s
+cc -o test-functionCall.exe test-functionCall.s
+./test-functionCall.exe
+diff -b test-functionCall.out tests/test-functionCall.out > test-functionCall.diff
+###### SUCCESS
+
+###### Testing test-if1
+./mmm.native tests/test-if1.mmm > test-if1.ll
+llc -relocation-model=pic test-if1.ll > test-if1.s
+cc -o test-if1.exe test-if1.s
+./test-if1.exe
+diff -b test-if1.out tests/test-if1.out > test-if1.diff
+###### SUCCESS
+
+###### Testing test-logic
+./mmm.native tests/test-logic.mmm > test-logic.ll
+llc -relocation-model=pic test-logic.ll > test-logic.s
+cc -o test-logic.exe test-logic.s
+./test-logic.exe
+diff -b test-logic.out tests/test-logic.out > test-logic.diff
+###### SUCCESS
+
+###### Testing test-matrix-default
+./mmm.native tests/test-matrix-default.mmm > test-matrix-default.ll
+llc -relocation-model=pic test-matrix-default.ll > test-matrix-default.s
+cc -o test-matrix-default.exe test-matrix-default.s
+./test-matrix-default.exe
+diff -b test-matrix-default.out tests/test-matrix-default.out > test-matrix-default.diff
+###### SUCCESS
+
+###### Testing test-matrix-height
+./mmm.native tests/test-matrix-height.mmm > test-matrix-height.ll
+llc -relocation-model=pic test-matrix-height.ll > test-matrix-height.s
+cc -o test-matrix-height.exe test-matrix-height.s
+./test-matrix-height.exe
+diff -b test-matrix-height.out tests/test-matrix-height.out > test-matrix-height.diff
+###### SUCCESS
+
+###### Testing test-matrix-inv
+./mmm.native tests/test-matrix-inv.mmm > test-matrix-inv.ll
+Fatal error: exception Stdlib.Parsing.Parse_error
+###### FAILED
+
+###### Testing test-matrix-mean
+./mmm.native tests/test-matrix-mean.mmm > test-matrix-mean.ll
+llc -relocation-model=pic test-matrix-mean.ll > test-matrix-mean.s
+cc -o test-matrix-mean.exe test-matrix-mean.s
+./test-matrix-mean.exe
+diff -b test-matrix-mean.out tests/test-matrix-mean.out > test-matrix-mean.diff
+###### SUCCESS
+
+###### Testing test-matrix-op-add
+./mmm.native tests/test-matrix-op-add.mmm > test-matrix-op-add.ll
+llc -relocation-model=pic test-matrix-op-add.ll > test-matrix-op-add.s
+cc -o test-matrix-op-add.exe test-matrix-op-add.s
+./test-matrix-op-add.exe
+diff -b test-matrix-op-add.out tests/test-matrix-op-add.out > test-matrix-op-add.diff
+###### SUCCESS
+
+###### Testing test-matrix-op-mul
+./mmm.native tests/test-matrix-op-mul.mmm > test-matrix-op-mul.ll
+llc -relocation-model=pic test-matrix-op-mul.ll > test-matrix-op-mul.s
+cc -o test-matrix-op-mul.exe test-matrix-op-mul.s
+./test-matrix-op-mul.exe
+diff -b test-matrix-op-mul.out tests/test-matrix-op-mul.out > test-matrix-op-mul.diff
+###### SUCCESS
+
+###### Testing test-matrix-op-sub
+./mmm.native tests/test-matrix-op-sub.mmm > test-matrix-op-sub.ll
+llc -relocation-model=pic test-matrix-op-sub.ll > test-matrix-op-sub.s
+cc -o test-matrix-op-sub.exe test-matrix-op-sub.s
+./test-matrix-op-sub.exe
+diff -b test-matrix-op-sub.out tests/test-matrix-op-sub.out > test-matrix-op-sub.diff
+###### SUCCESS
+
+###### Testing test-matrix-sum
+./mmm.native tests/test-matrix-sum.mmm > test-matrix-sum.ll
+llc -relocation-model=pic test-matrix-sum.ll > test-matrix-sum.s
+cc -o test-matrix-sum.exe test-matrix-sum.s
+./test-matrix-sum.exe
+diff -b test-matrix-sum.out tests/test-matrix-sum.out > test-matrix-sum.diff
+###### SUCCESS
+
+###### Testing test-matrix-width
+./mmm.native tests/test-matrix-width.mmm > test-matrix-width.ll
+llc -relocation-model=pic test-matrix-width.ll > test-matrix-width.s
+cc -o test-matrix-width.exe test-matrix-width.s
+./test-matrix-width.exe
+diff -b test-matrix-width.out tests/test-matrix-width.out > test-matrix-width.diff
+###### SUCCESS
+
+###### Testing test-matrix
+./mmm.native tests/test-matrix.mmm > test-matrix.ll
+llc -relocation-model=pic test-matrix.ll > test-matrix.s
+cc -o test-matrix.exe test-matrix.s
+./test-matrix.exe
+diff -b test-matrix.out tests/test-matrix.out > test-matrix.diff
+###### SUCCESS
+
+###### Testing test-matrix1
+./mmm.native tests/test-matrix1.mmm > test-matrix1.ll
+llc -relocation-model=pic test-matrix1.ll > test-matrix1.s
+cc -o test-matrix1.exe test-matrix1.s
+./test-matrix1.exe
+diff -b test-matrix1.out tests/test-matrix1.out > test-matrix1.diff
+###### SUCCESS
+
+###### Testing test-matrix2
+./mmm.native tests/test-matrix2.mmm > test-matrix2.ll
+llc -relocation-model=pic test-matrix2.ll > test-matrix2.s
+cc -o test-matrix2.exe test-matrix2.s
+./test-matrix2.exe
+diff -b test-matrix2.out tests/test-matrix2.out > test-matrix2.diff
+###### SUCCESS
+
+###### Testing test-printFloat1
+./mmm.native tests/test-printFloat1.mmm > test-printFloat1.ll
+llc -relocation-model=pic test-printFloat1.ll > test-printFloat1.s
+cc -o test-printFloat1.exe test-printFloat1.s
+./test-printFloat1.exe
+diff -b test-printFloat1.out tests/test-printFloat1.out > test-printFloat1.diff
+###### SUCCESS
+
+###### Testing test-printInt
+./mmm.native tests/test-printInt.mmm > test-printInt.ll
+llc -relocation-model=pic test-printInt.ll > test-printInt.s
+cc -o test-printInt.exe test-printInt.s
+./test-printInt.exe
+diff -b test-printInt.out tests/test-printInt.out > test-printInt.diff
+###### SUCCESS
+
+###### Testing test-printInt2
+./mmm.native tests/test-printInt2.mmm > test-printInt2.ll
+llc -relocation-model=pic test-printInt2.ll > test-printInt2.s
+cc -o test-printInt2.exe test-printInt2.s
+./test-printInt2.exe
+diff -b test-printInt2.out tests/test-printInt2.out > test-printInt2.diff
+###### SUCCESS
+
+###### Testing test-printInt3
+./mmm.native tests/test-printInt3.mmm > test-printInt3.ll
+llc -relocation-model=pic test-printInt3.ll > test-printInt3.s
+cc -o test-printInt3.exe test-printInt3.s
+./test-printInt3.exe
+diff -b test-printInt3.out tests/test-printInt3.out > test-printInt3.diff
+###### SUCCESS
+
+###### Testing test-printStr1
+./mmm.native tests/test-printStr1.mmm > test-printStr1.ll
+llc -relocation-model=pic test-printStr1.ll > test-printStr1.s
+cc -o test-printStr1.exe test-printStr1.s
+./test-printStr1.exe
+diff -b test-printStr1.out tests/test-printStr1.out > test-printStr1.diff
+###### SUCCESS
+
+###### Testing test-return1
+./mmm.native tests/test-return1.mmm > test-return1.ll
+llc -relocation-model=pic test-return1.ll > test-return1.s
+cc -o test-return1.exe test-return1.s
+./test-return1.exe
+diff -b test-return1.out tests/test-return1.out > test-return1.diff
+###### SUCCESS
+
+###### Testing test-return2
+./mmm.native tests/test-return2.mmm > test-return2.ll
+llc -relocation-model=pic test-return2.ll > test-return2.s
+cc -o test-return2.exe test-return2.s
+./test-return2.exe
+diff -b test-return2.out tests/test-return2.out > test-return2.diff
+###### SUCCESS
+
+###### Testing test-stringAssign1
+./mmm.native tests/test-stringAssign1.mmm > test-stringAssign1.ll
+llc -relocation-model=pic test-stringAssign1.ll > test-stringAssign1.s
+cc -o test-stringAssign1.exe test-stringAssign1.s
+./test-stringAssign1.exe
+diff -b test-stringAssign1.out tests/test-stringAssign1.out > test-stringAssign1.diff
+###### SUCCESS
+
+###### Testing test-while1
+./mmm.native tests/test-while1.mmm > test-while1.ll
+llc -relocation-model=pic test-while1.ll > test-while1.s
+cc -o test-while1.exe test-while1.s
+./test-while1.exe
+diff -b test-while1.out tests/test-while1.out > test-while1.diff
+###### SUCCESS
+
+###### Testing fail-assign1
+./mmm.native < tests/fail-assign1.mmm 2> fail-assign1.err >> testall.log
+diff -b fail-assign1.err tests/fail-assign1.err > fail-assign1.diff
+###### SUCCESS
+
+###### Testing fail-assign2
+./mmm.native < tests/fail-assign2.mmm 2> fail-assign2.err >> testall.log
+diff -b fail-assign2.err tests/fail-assign2.err > fail-assign2.diff
+###### SUCCESS
+
+###### Testing fail-assign3
+./mmm.native < tests/fail-assign3.mmm 2> fail-assign3.err >> testall.log
+diff -b fail-assign3.err tests/fail-assign3.err > fail-assign3.diff
+###### SUCCESS
+
+###### Testing fail-assign4
+./mmm.native < tests/fail-assign4.mmm 2> fail-assign4.err >> testall.log
+diff -b fail-assign4.err tests/fail-assign4.err > fail-assign4.diff
+###### SUCCESS
+
+###### Testing fail-declare
+./mmm.native < tests/fail-declare.mmm 2> fail-declare.err >> testall.log
+diff -b fail-declare.err tests/fail-declare.err > fail-declare.diff
+###### SUCCESS
+
+###### Testing fail-for1
+./mmm.native < tests/fail-for1.mmm 2> fail-for1.err >> testall.log
+diff -b fail-for1.err tests/fail-for1.err > fail-for1.diff
+###### SUCCESS
+
+###### Testing fail-func1
+./mmm.native < tests/fail-func1.mmm 2> fail-func1.err >> testall.log
+diff -b fail-func1.err tests/fail-func1.err > fail-func1.diff
+###### SUCCESS
+
+###### Testing fail-func2
+./mmm.native < tests/fail-func2.mmm 2> fail-func2.err >> testall.log
+diff -b fail-func2.err tests/fail-func2.err > fail-func2.diff
+###### SUCCESS
+
+###### Testing fail-func3
+./mmm.native < tests/fail-func3.mmm 2> fail-func3.err >> testall.log
+diff -b fail-func3.err tests/fail-func3.err > fail-func3.diff
+###### SUCCESS
+
+###### Testing fail-if1
+./mmm.native < tests/fail-if1.mmm 2> fail-if1.err >> testall.log
+diff -b fail-if1.err tests/fail-if1.err > fail-if1.diff
+###### SUCCESS
+
+###### Testing fail-matrix-add
+./mmm.native < tests/fail-matrix-add.mmm 2> fail-matrix-add.err >> testall.log
+diff -b fail-matrix-add.err tests/fail-matrix-add.err > fail-matrix-add.diff
+###### SUCCESS
+
+###### Testing fail-matrix-elemul
+./mmm.native < tests/fail-matrix-elemul.mmm 2> fail-matrix-elemul.err >> testall.log
+diff -b fail-matrix-elemul.err tests/fail-matrix-elemul.err > fail-matrix-elemul.diff
+###### SUCCESS
+
+###### Testing fail-matrix-mul
+./mmm.native < tests/fail-matrix-mul.mmm 2> fail-matrix-mul.err >> testall.log
+diff -b fail-matrix-mul.err tests/fail-matrix-mul.err > fail-matrix-mul.diff
+###### SUCCESS
+
+###### Testing fail-matrix1
+./mmm.native < tests/fail-matrix1.mmm 2> fail-matrix1.err >> testall.log
+diff -b fail-matrix1.err tests/fail-matrix1.err > fail-matrix1.diff
+###### SUCCESS
+
+###### Testing fail-matrix2
+./mmm.native < tests/fail-matrix2.mmm 2> fail-matrix2.err >> testall.log
+diff -b fail-matrix2.err tests/fail-matrix2.err > fail-matrix2.diff
+###### SUCCESS
+
+###### Testing fail-struct1
+./mmm.native < tests/fail-struct1.mmm 2> fail-struct1.err >> testall.log
+diff -b fail-struct1.err tests/fail-struct1.err > fail-struct1.diff
+###### SUCCESS
+
+###### Testing fail-struct2
+./mmm.native < tests/fail-struct2.mmm 2> fail-struct2.err >> testall.log
+diff -b fail-struct2.err tests/fail-struct2.err > fail-struct2.diff
+###### SUCCESS
+
+###### Testing fail-struct3
+./mmm.native < tests/fail-struct3.mmm 2> fail-struct3.err >> testall.log
+diff -b fail-struct3.err tests/fail-struct3.err > fail-struct3.diff
+###### SUCCESS
