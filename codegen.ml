@@ -123,9 +123,19 @@ let translate (functions, structs) =
     let lookup n = StringMap.find n local_vars 
     in
 
+    let mat_sizes =
+      List.fold_left (fun tmp c -> match c with
+      | (s,(r,c)) -> StringMap.add s (r,c) tmp) StringMap.empty fdecl.smatsiz 
+    in
+
     let lookup_size n = match n with
       | (A.SMatrix (r,c),_) -> (r,c)
       | _ -> (0,0)
+    in
+
+    let find_size_inmap n = 
+      try StringMap.find n mat_sizes with 
+      Not_found -> raise(Failure("Not found the matrix size"))
     in
 
     (*the function builds the matrixlit*)
@@ -222,7 +232,7 @@ let translate (functions, structs) =
     in
 
     (* Construct code for an expression; return its value *)
-    let rec expr builder ((_, e) : sexpr) = match e with
+    let rec expr builder ((typ, e) : sexpr) = match e with
 	      SIntlit i  -> L.const_int i32_t i
       | SBoolit b  -> L.const_int i1_t (if b then 1 else 0)
       | SFloatlit l -> L.const_float float_t l
@@ -250,6 +260,39 @@ let translate (functions, structs) =
           L.build_gep mat [|index|] "element_ptr_ptr" builder
         in
         L.build_load idx "element_ptr" builder
+
+      (* add matrix slicing here*)
+      | SMatslicing(s,e1,e2) ->
+        let (r,c) = find_size_inmap s in
+        
+        let (rs1,rt1) = (match e1 with (_,SRange(rs1,rt1)) -> (rs1,rt1)) in
+        let s1 = match rs1 with SBeg -> 0 | SEnd -> r-1 | SInd(s1) -> s1 in
+        let t1 = match rt1 with SBeg -> 0 | SEnd -> r-1 | SInd(t1) -> t1 in
+
+        let (rs2,rt2) = (match e2 with (_,SRange(rs2,rt2)) -> (rs2,rt2)) in
+        let s2 = match rs2 with SBeg -> 0 | SEnd -> c-1 | SInd(s2) -> s2 in
+        let t2 = match rt2 with SBeg -> 0 | SEnd -> c-1 | SInd(t2) -> t2 in
+
+        let ptr = L.build_load (lookup s) s builder in
+        let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
+
+        let res_mat = build_default_mat ((t1-s1+1),(t2-s2+1)) builder in
+        let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+        
+        let pointer = ref 0 in
+
+        (for i = 0 to r-1 do
+          (for j = 0 to c-1 do
+            let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t (i*c+j)|] "element_ptr_ptr" builder) in
+            let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+
+            (if ((s1<=i) && (i<=t1) && (s2<=j) && (j<=t2)) then (
+              let res_ptr_ptr = L.build_gep res [|L.const_int i32_t (!pointer)|] "res_ptr_ptr" builder in
+              ignore(L.build_store ele res_ptr_ptr builder);
+              pointer := !pointer+1;
+            ))
+          done);
+        done);res_mat
 
       | SEmpty     -> L.const_int i32_t 0
       | SVar s     -> L.build_load (lookup s) s builder
