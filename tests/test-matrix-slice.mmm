@@ -1,9 +1,9 @@
 func int main()
 {
     matrix m1 = [1.1,2.2,3.3;4.4,5.5,6.6];
-    matrix res[2,2];
-    res = m1[0:1][1:2];
-    float a = res[1][1];
+    matrix res[2,1];
+    res = m1[0:1][1];
+    float a = res[0][0];
     printFloat(a);
     return 0;    
 }
