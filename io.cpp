@@ -42,8 +42,8 @@ extern "C" double* load_cpp(char imageName[])
     }
     
     // cout.precision(17);
-    cout << "height: " << fixed << output[0] << endl;
-    cout << "width: " << fixed << output[1] << endl;
+    cout << "width: " << fixed << output[0] << endl;
+    cout << "height: " << fixed << output[1] << endl;
 
     return output;
 }
