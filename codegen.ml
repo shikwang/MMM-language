@@ -131,7 +131,7 @@ let translate (functions, structs) =
         L.set_value_name n p;
 	      let local = match t with 
                     SStruct(stn) -> let (sdef,_) = StringMap.find stn struct_decls in
-                                  L.build_malloc sdef n builder 
+                         L.build_alloca (pointer_t sdef) (n^"_ptr") builder
                   | _ -> L.build_alloca (ltype_of_typ t) n builder  
         in
       ignore (L.build_store p local builder);
@@ -142,7 +142,7 @@ let translate (functions, structs) =
       and add_local m (t, n) = 
           let local_var = match t with 
               SStruct(stn) -> let (sdef,_) = StringMap.find stn struct_decls in
-                              L.build_malloc sdef n builder 
+                   L.build_alloca (pointer_t sdef) (n^"_ptr") builder
             | _ -> L.build_alloca (ltype_of_typ t) n builder 
           in StringMap.add n local_var m 
       in
@@ -413,12 +413,25 @@ let translate (functions, structs) =
               [] -> raise (Failure ("unrecognized struct member " ^ m))
             | Primdecl(_, nm) :: tl -> if m = nm then 0 else 1 + find_idx m tl
           in find_idx member sdecl.sstvar
-        in L.build_struct_gep (lookup vname) mem_idx (vname ^ member) builder
+        in let str_ptr = L.build_load (lookup vname) vname builder
+        in L.build_load (L.build_struct_gep str_ptr mem_idx (stn ^ member) builder) (vname ^ member) builder
 
       | SAssign (s, e) -> 
         let e' = expr builder e in 
           (match s with 
             | (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
+            | (_,SStruaccess(vname, member)) -> 
+                let mem_ptr = 
+                let stn = StringMap.find vname stru_name in
+                let (sdef,sdecl) = StringMap.find stn struct_decls in
+                let mem_idx = 
+                  let rec find_idx m mlist = match mlist with
+                      [] -> raise (Failure ("unrecognized struct member " ^ m))
+                    | Primdecl(_, nm) :: tl -> if m = nm then 0 else 1 + find_idx m tl
+                  in find_idx member sdecl.sstvar
+                in let str_ptr = L.build_load (lookup vname) vname builder
+                in L.build_struct_gep str_ptr mem_idx (stn ^ member) builder
+                in ignore(L.build_store e' mem_ptr builder); e'
             | _ -> raise (Failure "Assign Failiure!"))
 
       | SBinop (e1, op, e2) ->
@@ -686,10 +699,13 @@ let translate (functions, structs) =
                                              (ignore(L.build_store e' (lookup name) builder); builder))
       | SDefaultmat (name, r, c) -> (L.build_store (build_default_mat (r,c) builder) (lookup name) builder);builder
       | SIniStrucct (var, strucname, mems) -> 
+        let (sdef,_) = StringMap.find strucname struct_decls in
         let llmems = List.rev (List.map (expr builder) (List.rev mems)) in
+        let str_ptr = L.build_malloc sdef (var ^ "_malloc") builder in
         let build_struct i llmem = 
-          ignore(L.build_store llmem (L.build_struct_gep (lookup var) i (var ^ "_" ^string_of_int i) builder) builder); i+1
-        in ignore(List.fold_left build_struct 0 llmems); builder
+          ignore(L.build_store llmem (L.build_struct_gep str_ptr i (var ^ "_" ^string_of_int i) builder) builder); i+1
+        in ignore(List.fold_left build_struct 0 llmems);
+        ignore(L.build_store str_ptr (lookup var) builder); builder
     in
 
     (* Build the code for each statement in the function *)

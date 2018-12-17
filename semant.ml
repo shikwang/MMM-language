@@ -190,14 +190,14 @@ let check(functions, structures)=
           | []              -> (a, b, c)
           in build_map_list sym siz smp sl
       in 
-      let symb = 
-        let transfer m f = match f with 
-        Primdecl(ty,na) -> StringMap.add na ty m
-      | Strudecl(str,na) -> let sttyp = SStruct(str) in StringMap.add na sttyp m 
+      let (symb, sttmap) = 
+        let transfer (m,s) f = match f with 
+        Primdecl(ty,na) -> (StringMap.add na ty m, s)
+      | Strudecl(str,na) -> let sttyp = SStruct(str) in (StringMap.add na sttyp m, StringMap.add na str s)
         in
-        List.fold_left transfer StringMap.empty (func.formals) 
+        List.fold_left transfer (StringMap.empty, StringMap.empty) (func.formals) 
       in
-      build_map symb StringMap.empty StringMap.empty (Block func.body)
+      build_map symb StringMap.empty sttmap (Block func.body)
     in
 
 
