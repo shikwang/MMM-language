@@ -1,0 +1,11 @@
+func int main(){
+    /* this
+    is
+    a 
+    comment
+    */
+
+    int a = 3;
+    print(a);
+    return 0;
+}

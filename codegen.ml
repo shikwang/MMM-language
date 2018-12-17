@@ -44,24 +44,11 @@ let translate (functions, structs) =
   (* function types *)
   let printf_t : L.lltype = L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
   let printf_func : L.llvalue = L.declare_function "printf" printf_t the_module in
-
-  let open_t = L.var_arg_function_type i32_t [| L.pointer_type i8_t;i32_t |] in
-  let open_func = L.declare_function "open" open_t the_module in
-
-
-  (* let read_t = L.var_arg_function_type i32_t [| i32_t; L.pointer_type i32_t; i32_t |] in
-  let read_func = L.declare_function "read" read_t the_module in
-  let readbyte_t = L.var_arg_function_type i32_t [| i32_t; L.pointer_type i8_t; i32_t |] in
-  let readbyte_func = L.declare_function "read" readbyte_t the_module in *)
-  let readfl_t = L.var_arg_function_type i32_t [| i32_t; L.pointer_type float_t; i32_t |] in
-  let readfl_func = L.declare_function "read" readfl_t the_module in
-  let creat_t = L.var_arg_function_type i32_t [| L.pointer_type i8_t;i32_t |] in
-  let creat_func = L.declare_function "creat" creat_t the_module in
-  let write_t = L.var_arg_function_type i32_t [| i32_t; L.pointer_type i8_t; i32_t |] in
-  let write_func = L.declare_function "write" write_t the_module in
-  let close_t = L.var_arg_function_type i32_t [| i32_t |] in
-  let close_func = L.declare_function "close" close_t the_module in
-
+  
+  let load_cpp_t : L.lltype = L.function_type (L.pointer_type float_t) [| L.pointer_type i8_t |] in
+  let load_cpp_func : L.llvalue = L.declare_function "load_cpp" load_cpp_t the_module in
+  let save_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type i8_t |] in
+  let save_cpp_func : L.llvalue = L.declare_function "save_cpp" save_cpp_t the_module in
   (*
   let getHeight_t : L.function_type i32_t [| matrix_t |] in
   let getHeight_func = L.declare_function "height" getHeight_t the_module in 
@@ -340,20 +327,62 @@ let translate (functions, structs) =
         L.build_call printf_func [| float_format_str ; (expr builder e) |]
         "printf" builder
 
-      | SCall ("open", ([ e ; e2 ])) ->
-              (L.build_call open_func [| expr builder e;expr builder e2|] "open" builder)
+      (* | SCall ("open", ([ e1 ; e2 ])) ->
+              (L.build_call open_func [| expr builder e;expr builder e2|] "open" builder) *)
+  
+      | SCall ("imread", [s;e]) ->
+        
+
+        let path = expr builder s in
+        let (r,c) = lookup_size e in
+        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
+        let res = L.build_call load_cpp_func [| path |] "res_arr" builder in
+        (for i=0 to r*c-1 do
+
+          let m_ele_ptr_ptr = L.build_gep mat [|L.const_int i32_t i|] "element_ptr_ptr" builder in
+          let m_ele_ptr = L.build_load m_ele_ptr_ptr "element_ptr" builder in
+          let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
+          let ele = L.build_load res_ptr_ptr "res_ptr" builder in
+          ignore(L.build_store ele m_ele_ptr_ptr builder)
+        done); res
+
+      (* | SCall ("save", [s;e]) ->
+        let path = expr builder s in
+        let (r,c) = lookup_size e in
+        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
+        let res_mat = build_default_mat (r1,c1) builder in (* Change the r and c size here *)
+        let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+
+            
+            
+            
+            ignore(L.build_call save_cpp_func [| return_arr; path |] "" !builder); *)
+
       
-      (* | SCall ("imread", ([e; e2 ])) ->
-        let e' = expr builder e in
-        let e2' = expr builder e in 
-        (* let arrptr = (lookup ev) in  *)
-        (* need array size  *)
-        let fd = (L.build_call open_func [| ev ; L.const_int i32_t 0|] "open" builder) in
-        let ret = L.build_call readfl_func 
-            [| fd ;
-              (L.build_gep arrptr [|L.const_int i32_t 0;L.const_int i32_t 0|] "tmp" builder);
-                L.const_int i32_t (arrsize*8)|] "read" builder in
-        (ignore (L.build_call close_func [| fd |] "close" builder));ret  *)
+
+
+
+          
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

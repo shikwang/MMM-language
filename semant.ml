@@ -73,22 +73,29 @@ let check(functions, structures)=
         ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Void);
         ("eig",Matrix,Void);("inv",Matrix,Matrix);("det",Matrix,Void)
       ]
-    in StringMap.add "imread"   
-      {
+    in 
+    
+    let add_bind2 map (name,v) = StringMap.add name v map
+    in List.fold_left add_bind2 part_built_indecls [
+      ("imread",{
         ftyp = Void;
         fname = "imread";
         formals = [Primdecl(String,"x"); Primdecl(Matrix,"m")];
         body = [];
-      } part_built_indecls;
-
-    StringMap.add "cov"
-    {
+      });
+      ("save",{
+        ftyp = Void;
+        fname = "save";
+        formals = [Primdecl(String,"x"); Primdecl(Matrix,"m")];
+        body = [];
+      });
+      ("cov", {
       ftyp = Matrix;
       fname = "cov";
       formals = [Primdecl(Matrix,"x"); Primdecl(Matrix,"y")];
       body = [];
-    } part_built_indecls;
-  
+      })]
+    
   in
 
   let function_decls = List.fold_left (

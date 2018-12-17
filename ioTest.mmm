@@ -1,0 +1,11 @@
+func int main(){
+
+    //matrix m[251,376];
+    matrix m[2,2];
+    imread("b.jpg",m);
+    printFloat(m[0][0]);
+    printFloat(m[0][1]);
+    printFloat(m[1][0]);
+    printFloat(m[1][1]);
+    return 0;
+}

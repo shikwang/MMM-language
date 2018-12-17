@@ -1,0 +1,6 @@
+func int main(){
+    // test comment
+    int a = 3;
+    print(a);
+    return 0;
+}
