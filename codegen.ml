@@ -564,7 +564,7 @@ let translate (functions, structs) =
         done);
         L.build_fdiv (L.build_load sum "addsum" builder) (L.const_float float_t 4.0) "mean_sum" builder
 
-      | SCall ("inv", [e]) ->
+      | SCall ("trans", [e]) ->
         let (r,c) = lookup_size e in
         let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
         let res_mat = build_default_mat (c,r) builder in
