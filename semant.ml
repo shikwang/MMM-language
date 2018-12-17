@@ -70,7 +70,7 @@ let check(functions, structures)=
       in List.fold_left add_bind StringMap.empty [
         ("print",Int,Void);("printStr",String,Void);("printFloat",Float,Void);
         ("height",Matrix,Int);("width",Matrix,Int);
-        ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Void);
+        ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Matrix);
         ("eig",Matrix,Void);("inv",Matrix,Matrix);("det",Matrix,Void)
       ]
     in StringMap.add "imread"   
