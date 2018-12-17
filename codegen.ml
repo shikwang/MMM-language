@@ -62,9 +62,6 @@ let translate (functions, structs) =
   (* use to interrupt the function flow and throw run-time exception *)
   let abort_func = L.declare_function "abort" (L.function_type void_t [||]) the_module in
 
-  let open_t = L.var_arg_function_type i32_t [| L.pointer_type i8_t;i32_t |] in
-  let open_func = L.declare_function "open" open_t the_module in
-
 
   let load_cpp_t : L.lltype = L.function_type (L.pointer_type float_t) [| L.pointer_type i8_t |] in
   let load_cpp_func : L.llvalue = L.declare_function "load_cpp" load_cpp_t the_module in
@@ -510,7 +507,7 @@ let translate (functions, structs) =
       and need to assign value one by one to 3 matrix in the struct
       details are in io.cpp *)
       | SCall ("imread", [s;e]) ->
-        
+
 
         let path = expr builder s in
         let (r,c) = lookup_size e in
@@ -525,16 +522,11 @@ let translate (functions, structs) =
           ignore(L.build_store ele m_ele_ptr_ptr builder)
         done); res
 
-      (* | SCall ("save", [s;e]) ->
+      | SCall ("imwrite", [s;e]) ->
         let path = expr builder s in
         let (r,c) = lookup_size e in
         let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
-        let res_mat = build_default_mat (r1,c1) builder in (* Change the r and c size here *)
-        let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
-
-                
-            
-            ignore(L.build_call save_cpp_func [| return_arr; path |] "" !builder); *)
+        ignore(L.build_call save_cpp_func [| mat; path |] "" builder);mat
 
       | SCall("abort",[]) -> 
         ignore(L.build_call printf_func [| string_format_str ; L.build_global_stringptr "Error: Matrix index out of bound" "tmp" builder|] "printf" builder);
@@ -542,6 +534,14 @@ let translate (functions, structs) =
 
 
       
+
+
+
+
+
+
+
+
 
 
 

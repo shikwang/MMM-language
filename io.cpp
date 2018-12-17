@@ -42,20 +42,22 @@ extern "C" double* load_cpp(char imageName[])
     }
     
     // cout.precision(17);
-    cout << "width: " << fixed << output[0] << endl;
-    cout << "height: " << fixed << output[1] << endl;
+    cout << "input height: " << fixed << output[0] << endl;
+    cout << "input width: " << fixed << output[1] << endl;
 
     return output;
 }
 
 extern "C" void save_cpp(double* input, char fileName[]) 
 {
-    int height = input[0];
-    int width = input[1];
+    int height = (int)input[0];
+    int width = (int)input[1];
     double* data = new double[3*width*height];
     for(int i = 0; i < 3*width*height; i++) data[i]=input[i+2];
     Mat image = cv::Mat(height, width, CV_64FC3, data);
     imwrite(fileName,image);
+    cout << "output width: " << width << endl;
+    cout << "output height: " << height << endl;
     return;
 }
 

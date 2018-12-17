@@ -7,5 +7,6 @@ func int main(){
     printFloat(m[0][1]);
     printFloat(m[1][0]);
     printFloat(m[1][1]);
+    imwrite("out.jpg",m);
     return 0;
 }

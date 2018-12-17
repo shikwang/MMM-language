@@ -51,7 +51,7 @@ let check(functions, structures)=
     | "det" :: _ -> raise (Failure ("function det may not be defined"))
     | "cov" :: _ -> raise (Failure ("function cov may not be defined"))
     | "imread" :: _ -> raise (Failure ("function imread may not be defined"))
-    | "save" :: _ -> raise (Failure ("function save may not be defined"))
+    | "imwrite" :: _ -> raise (Failure ("function save may not be defined"))
     | _ :: t -> helper t
     in helper list
   in report_built_in_duplicate (List.map (fun fd -> fd.fname) functions);
@@ -83,9 +83,9 @@ let check(functions, structures)=
         formals = [Primdecl(String,"x"); Primdecl(Matrix,"m")];
         body = [];
       });
-      ("save",{
+      ("imwrite",{
         ftyp = Void;
-        fname = "save";
+        fname = "imwrite";
         formals = [Primdecl(String,"x"); Primdecl(Matrix,"m")];
         body = [];
       });
