@@ -11,7 +11,7 @@ brew install glog
 ```
 
 
-io.cpp is for external openCV library
+io.cpp is for external openCV library;
 io_compile.sh is to compile with io.cpp
 
 
