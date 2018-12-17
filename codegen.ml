@@ -7,6 +7,19 @@ module StringMap = Map.Make(String)
 
 (* translate : Sast.program -> Llvm.module *)
 let translate (functions, structs) =
+  let idx_check = {
+          sftyp = Void;
+          sfname = "index_check";
+          sformals = [Primdecl(Int,"i");Primdecl(Int,"r")];
+          slocals = [];
+          smatsiz = [];
+          strlist =[];
+          sbody = [SIf((Boolean, SBinop ((Int, SVar "i"), Less, (Int, SIntlit 0))), SBlock([SExpr (Void, SCall("abort",[]))]), SBlock([]));
+          SIf((Boolean, SBinop ((Int, SVar "i"), Geq, (Int, SVar "r"))), SBlock([SExpr (Void, SCall("abort",[]))]), SBlock([]))]
+  } 
+  in
+  let functions = idx_check::functions in
+
   let context    = L.global_context () in
 
   (* Create the LLVM compilation module into which we will generate code *)
@@ -44,29 +57,55 @@ let translate (functions, structs) =
   (* function types *)
   let printf_t : L.lltype = L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
   let printf_func : L.llvalue = L.declare_function "printf" printf_t the_module in
-  
+
+
+  (* use to interrupt the function flow and throw run-time exception *)
+  let abort_func = L.declare_function "abort" (L.function_type void_t [||]) the_module in
+
+  let open_t = L.var_arg_function_type i32_t [| L.pointer_type i8_t;i32_t |] in
+  let open_func = L.declare_function "open" open_t the_module in
+
+
   let load_cpp_t : L.lltype = L.function_type (L.pointer_type float_t) [| L.pointer_type i8_t |] in
   let load_cpp_func : L.llvalue = L.declare_function "load_cpp" load_cpp_t the_module in
   let save_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type i8_t |] in
   let save_cpp_func : L.llvalue = L.declare_function "save_cpp" save_cpp_t the_module in
+
   (*
   let getHeight_t : L.function_type i32_t [| matrix_t |] in
   let getHeight_func = L.declare_function "height" getHeight_t the_module in 
   *)
 
-  (* Define each function (arguments and return type) so we can 
-    call it even before we've created its body *)
-  let function_decls : (L.llvalue * sfunc_decl) StringMap.t =
-    let function_decl m fdecl =
-      let name = fdecl.sfname
-          and formal_types = Array.of_list(List.map (fun (t,_) -> ltype_of_typ t) 
+  let struct_decls : (L.lltype * sstruc_decl) StringMap.t = 
+    let struct_decl m sdecl = 
+      let struc_name = sdecl.sstname 
+          and mem_types = Array.of_list(List.map (fun (t,_) -> ltype_of_typ t) 
           (List.map (fun c -> match c with 
             Primdecl(a,b) -> (a,b)
-          | Strudecl(a,b) -> (Struct,b)) fdecl.sformals) 
-          )
-      in let ftype = L.function_type (ltype_of_typ fdecl.sftyp) formal_types in
-      StringMap.add name (L.define_function name ftype the_module, fdecl) m in
-    List.fold_left function_decl StringMap.empty functions in
+          | _ -> raise (Failure "Struct cannot have struct member!")) sdecl.sstvar))
+      in let stype = L.named_struct_type context struc_name in 
+      ignore(L.struct_set_body stype mem_types false);
+      StringMap.add struc_name (stype, sdecl) m in
+    List.fold_left struct_decl StringMap.empty structs in
+
+  (* Define each function (arguments and return type) so we can 
+    call it even before we've created its body *)
+    let function_decls : (L.llvalue * sfunc_decl) StringMap.t =
+      let function_decl m fdecl =
+        let name = fdecl.sfname
+        and formal_types = 
+            let formal_list = List.map (fun c -> match c with 
+            Primdecl(a,b) -> (a,b)
+          | Strudecl(a,b) -> (SStruct(a),b)) fdecl.sformals 
+            in let typ_trans (t,v) = match t with
+                SStruct(stn) -> let (sdef,_) = StringMap.find stn struct_decls in
+                                pointer_t sdef
+              | _ -> ltype_of_typ t
+            in
+            Array.of_list (List.map typ_trans formal_list)
+        in let ftype = L.function_type (ltype_of_typ fdecl.sftyp) formal_types in
+        StringMap.add name (L.define_function name ftype the_module, fdecl) m in
+      List.fold_left function_decl StringMap.empty functions in
 
   (* Fill in the body of the given function *)
   let build_function_body fdecl =
@@ -83,26 +122,33 @@ let translate (functions, structs) =
     let local_vars =
       let add_formal m (t, n) p = 
         L.set_value_name n p;
-	    let local = L.build_alloca (ltype_of_typ t) n builder in
-        ignore (L.build_store p local builder);
+	      let local = match t with 
+                    SStruct(stn) -> let (sdef,_) = StringMap.find stn struct_decls in
+                         L.build_alloca (pointer_t sdef) (n^"_ptr") builder
+                  | _ -> L.build_alloca (ltype_of_typ t) n builder  
+        in
+      ignore (L.build_store p local builder);
 	    StringMap.add n local m 
 
       (* Allocate space for any locally declared variables and add the
       * resulting registers to our map *)
-      and add_local m (t, n) =
-      let local_var = L.build_alloca (ltype_of_typ t) n builder
-        in StringMap.add n local_var m 
+      and add_local m (t, n) = 
+          let local_var = match t with 
+              SStruct(stn) -> let (sdef,_) = StringMap.find stn struct_decls in
+                   L.build_alloca (pointer_t sdef) (n^"_ptr") builder
+            | _ -> L.build_alloca (ltype_of_typ t) n builder 
+          in StringMap.add n local_var m 
       in
       let formal_list = List.map (fun c -> match c with 
                                               Primdecl(a,b) -> (a,b)
-                                            | Strudecl(a,b) -> (Struct,b)) fdecl.sformals
+                                            | Strudecl(a,b) -> (SStruct(a),b)) fdecl.sformals
       in
       let formals = List.fold_left2 add_formal StringMap.empty formal_list
                     (Array.to_list (L.params the_function)) 
       in List.fold_left add_local formals (List.filter (fun s -> not (List.mem s formal_list))
                     (List.map (fun c -> match c with 
                       Primdecl(a,b) -> (a,b)
-                      | Strudecl(a,b) -> (Struct,b))  fdecl.slocals))
+                    | Strudecl(a,b) -> (SStruct(a),b))  fdecl.slocals))
     in
 
     (* Return the value for a variable or formal argument.
@@ -110,9 +156,24 @@ let translate (functions, structs) =
     let lookup n = StringMap.find n local_vars 
     in
 
+    let stru_name =
+      List.fold_left (fun tmp c -> match c with
+      | (v,stn) -> StringMap.add v stn tmp) StringMap.empty fdecl.strlist
+    in
+
+    let mat_sizes =
+      List.fold_left (fun tmp c -> match c with
+      | (s,(r,c)) -> StringMap.add s (r,c) tmp) StringMap.empty fdecl.smatsiz 
+    in
+
     let lookup_size n = match n with
       | (A.SMatrix (r,c),_) -> (r,c)
       | _ -> (0,0)
+    in
+
+    let find_size_inmap n = 
+      try StringMap.find n mat_sizes with 
+      Not_found -> raise(Failure("Not found the matrix size"))
     in
 
     (*the function builds the matrixlit*)
@@ -209,7 +270,7 @@ let translate (functions, structs) =
     in
 
     (* Construct code for an expression; return its value *)
-    let rec expr builder ((_, e) : sexpr) = match e with
+    let rec expr builder ((typ, e) : sexpr) = match e with
 	      SIntlit i  -> L.const_int i32_t i
       | SBoolit b  -> L.const_int i1_t (if b then 1 else 0)
       | SFloatlit l -> L.const_float float_t l
@@ -231,12 +292,105 @@ let translate (functions, structs) =
           let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
           let r = L.build_load (L.build_struct_gep ptr 1 "m_r" builder) "r_mat" builder in
           let c = L.build_load (L.build_struct_gep ptr 2 "m_c" builder) "c_mat" builder in
-
-          (*L.build_load (build_matrix_access (mat r c e1' e2' builder) "element_ptr" builder)*)
           let index = L.build_add e2' (L.build_mul e1' c "tmp" builder) "index" builder in
+          let (fdef, _) = StringMap.find "index_check" function_decls in
+          ignore(L.build_call fdef [| e1'; r |] "" builder);
+          ignore(L.build_call fdef [| e2'; c |] "" builder);
           L.build_gep mat [|index|] "element_ptr_ptr" builder
         in
         L.build_load idx "element_ptr" builder
+
+      (* add matrix slicing here*)
+      | SMatslicing(s,e1,e2) ->
+        (match (e1,e2) with 
+          | ((_,SRange(rs1,rt1)),(_,SRange(rs2,rt2))) ->
+            (let (r,c) = find_size_inmap s in
+            
+            let (rs1,rt1) = (match e1 with (_,SRange(rs1,rt1)) -> (rs1,rt1)) in
+            let s1 = match rs1 with SBeg -> 0 | SEnd -> r-1 | SInd(s1) -> s1 in
+            let t1 = match rt1 with SBeg -> 0 | SEnd -> r-1 | SInd(t1) -> t1 in
+
+            let (rs2,rt2) = (match e2 with (_,SRange(rs2,rt2)) -> (rs2,rt2)) in
+            let s2 = match rs2 with SBeg -> 0 | SEnd -> c-1 | SInd(s2) -> s2 in
+            let t2 = match rt2 with SBeg -> 0 | SEnd -> c-1 | SInd(t2) -> t2 in
+
+            let ptr = L.build_load (lookup s) s builder in
+            let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
+
+            let res_mat = build_default_mat ((t1-s1+1),(t2-s2+1)) builder in
+            let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+            
+            let pointer = ref 0 in
+
+            (for i = 0 to r-1 do
+              (for j = 0 to c-1 do
+                let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t (i*c+j)|] "element_ptr_ptr" builder) in
+                let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+
+                (if ((s1<=i) && (i<=t1) && (s2<=j) && (j<=t2)) then (
+                  let res_ptr_ptr = L.build_gep res [|L.const_int i32_t (!pointer)|] "res_ptr_ptr" builder in
+                  ignore(L.build_store ele res_ptr_ptr builder);
+                  pointer := !pointer+1;
+                ))
+              done);
+            done);res_mat)
+
+          | (e1,(_,SRange(rs2,rt2))) ->
+            (let (r,c) = find_size_inmap s in
+            let (rs2,rt2) = (match e2 with (_,SRange(rs2,rt2)) -> (rs2,rt2)) in
+            let s2 = match rs2 with SBeg -> 0 | SEnd -> c-1 | SInd(s2) -> s2 in
+            let t2 = match rt2 with SBeg -> 0 | SEnd -> c-1 | SInd(t2) -> t2 in
+
+            let ptr = L.build_load (lookup s) s builder in
+            let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
+
+            let res_mat = build_default_mat (1,(t2-s2+1)) builder in
+            let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+            
+            let pointer = ref 0 in
+            
+            let i = expr builder e1 in
+
+            (for j = 0 to c-1 do
+              let index = L.build_add (L.build_mul i (L.const_int i32_t c) "mul_tmp" builder) (L.const_int i32_t j) "add_tmp" builder in
+              let ele_ptr_ptr = (L.build_gep mat [|index|] "element_ptr_ptr" builder) in
+              let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+
+              (if ((s2<=j) && (j<=t2)) then (
+                let res_ptr_ptr = L.build_gep res [|L.const_int i32_t (!pointer)|] "res_ptr_ptr" builder in
+                ignore(L.build_store ele res_ptr_ptr builder);
+                pointer := !pointer+1;
+              ))
+            done);res_mat)
+            
+          | ((_,SRange(rs1,rt1)),e2) ->
+            (let (r,c) = find_size_inmap s in
+            let (rs1,rt1) = (match e1 with (_,SRange(rs1,rt1)) -> (rs1,rt1)) in
+            let s1 = match rs1 with SBeg -> 0 | SEnd -> r-1 | SInd(s1) -> s1 in
+            let t1 = match rt1 with SBeg -> 0 | SEnd -> r-1 | SInd(t1) -> t1 in
+
+            let ptr = L.build_load (lookup s) s builder in
+            let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
+
+            let res_mat = build_default_mat ((t1-s1+1),1) builder in
+            let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+            
+            let pointer = ref 0 in
+            
+            let j = expr builder e2 in
+
+            (for i = 0 to r-1 do
+              let index = L.build_add (L.build_mul (L.const_int i32_t i) (L.const_int i32_t c) "mul_tmp" builder) j "add_tmp" builder in
+              let ele_ptr_ptr = (L.build_gep mat [|index|] "element_ptr_ptr" builder) in
+              let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
+
+              (if ((s1<=i) && (i<=t1)) then (
+                let res_ptr_ptr = L.build_gep res [|L.const_int i32_t (!pointer)|] "res_ptr_ptr" builder in
+                ignore(L.build_store ele res_ptr_ptr builder);
+                pointer := !pointer+1;
+              ))
+            done);res_mat)
+        )
 
       | SEmpty     -> L.const_int i32_t 0
       | SVar s     -> L.build_load (lookup s) s builder
@@ -245,10 +399,32 @@ let translate (functions, structs) =
           | true -> ptr
           | false -> (L.build_load (ptr) s builder))*)
 
+      | SStruaccess(vname, member) -> let stn = StringMap.find vname stru_name in
+        let (sdef,sdecl) = StringMap.find stn struct_decls in
+        let mem_idx = 
+          let rec find_idx m mlist = match mlist with
+              [] -> raise (Failure ("unrecognized struct member " ^ m))
+            | Primdecl(_, nm) :: tl -> if m = nm then 0 else 1 + find_idx m tl
+          in find_idx member sdecl.sstvar
+        in let str_ptr = L.build_load (lookup vname) vname builder
+        in L.build_load (L.build_struct_gep str_ptr mem_idx (stn ^ member) builder) (vname ^ member) builder
+
       | SAssign (s, e) -> 
         let e' = expr builder e in 
           (match s with 
             | (_,SVar(s1)) -> ignore(L.build_store e' (lookup s1) builder); e'
+            | (_,SStruaccess(vname, member)) -> 
+                let mem_ptr = 
+                let stn = StringMap.find vname stru_name in
+                let (sdef,sdecl) = StringMap.find stn struct_decls in
+                let mem_idx = 
+                  let rec find_idx m mlist = match mlist with
+                      [] -> raise (Failure ("unrecognized struct member " ^ m))
+                    | Primdecl(_, nm) :: tl -> if m = nm then 0 else 1 + find_idx m tl
+                  in find_idx member sdecl.sstvar
+                in let str_ptr = L.build_load (lookup vname) vname builder
+                in L.build_struct_gep str_ptr mem_idx (stn ^ member) builder
+                in ignore(L.build_store e' mem_ptr builder); e'
             | _ -> raise (Failure "Assign Failiure!"))
 
       | SBinop (e1, op, e2) ->
@@ -327,9 +503,12 @@ let translate (functions, structs) =
         L.build_call printf_func [| float_format_str ; (expr builder e) |]
         "printf" builder
 
-      (* | SCall ("open", ([ e1 ; e2 ])) ->
-              (L.build_call open_func [| expr builder e;expr builder e2|] "open" builder) *)
-  
+      
+      (* can read value from image but not correctly
+      res[0] should be read as #rows
+      res[1] should be read as #cols
+      and need to assign value one by one to 3 matrix in the struct
+      details are in io.cpp *)
       | SCall ("imread", [s;e]) ->
         
 
@@ -353,10 +532,14 @@ let translate (functions, structs) =
         let res_mat = build_default_mat (r1,c1) builder in (* Change the r and c size here *)
         let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
 
-            
-            
+                
             
             ignore(L.build_call save_cpp_func [| return_arr; path |] "" !builder); *)
+
+      | SCall("abort",[]) -> 
+        ignore(L.build_call printf_func [| string_format_str ; L.build_global_stringptr "Error: Matrix index out of bound" "tmp" builder|] "printf" builder);
+        L.build_call abort_func [| |] "" builder
+
 
       
 
@@ -364,29 +547,6 @@ let translate (functions, structs) =
 
           
         
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       | SCall ("height",[e]) ->
         let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
         r
@@ -421,7 +581,7 @@ let translate (functions, structs) =
         done);
         L.build_fdiv (L.build_load sum "addsum" builder) (L.const_float float_t 4.0) "mean_sum" builder
 
-      | SCall ("inv", [e]) ->
+      | SCall ("trans", [e]) ->
         let (r,c) = lookup_size e in
         let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
         let res_mat = build_default_mat (c,r) builder in
@@ -555,6 +715,14 @@ let translate (functions, structs) =
                                       | _ -> let e' = expr builder e in
                                              (ignore(L.build_store e' (lookup name) builder); builder))
       | SDefaultmat (name, r, c) -> (L.build_store (build_default_mat (r,c) builder) (lookup name) builder);builder
+      | SIniStrucct (var, strucname, mems) -> 
+        let (sdef,_) = StringMap.find strucname struct_decls in
+        let llmems = List.rev (List.map (expr builder) (List.rev mems)) in
+        let str_ptr = L.build_malloc sdef (var ^ "_malloc") builder in
+        let build_struct i llmem = 
+          ignore(L.build_store llmem (L.build_struct_gep str_ptr i (var ^ "_" ^string_of_int i) builder) builder); i+1
+        in ignore(List.fold_left build_struct 0 llmems);
+        ignore(L.build_store str_ptr (lookup var) builder); builder
     in
 
     (* Build the code for each statement in the function *)

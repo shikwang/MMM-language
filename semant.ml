@@ -70,7 +70,7 @@ let check(functions, structures)=
       in List.fold_left add_bind StringMap.empty [
         ("print",Int,Void);("printStr",String,Void);("printFloat",Float,Void);
         ("height",Matrix,Int);("width",Matrix,Int);
-        ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Void);
+        ("sum",Matrix,Float);("mean",Matrix,Float);("trans",Matrix,Matrix);
         ("eig",Matrix,Void);("inv",Matrix,Matrix);("det",Matrix,Void)
       ]
     in 
@@ -185,7 +185,7 @@ let check(functions, structures)=
       | Defaultmat(m, r, c) -> if StringMap.mem m sym then raise (Failure "matrix has been defined")
         else (StringMap.add m Matrix sym, StringMap.add m (r,c) siz, smp)
       | IniStrucct(v, stname, elist) -> if StringMap.mem v sym then raise (Failure "struct has been defined")
-        else (StringMap.add v Struct sym, siz, StringMap.add v stname smp)
+        else let sttyp = SStruct(stname) in (StringMap.add v sttyp sym, siz, StringMap.add v stname smp)
       (* A block is correct if each statement is correct and nothing
       follows any Return statement.  Nested blocks are flattened. *)
       | Block sl -> 
@@ -197,14 +197,16 @@ let check(functions, structures)=
           | []              -> (a, b, c)
           in build_map_list sym siz smp sl
       in 
-      let symb = 
-        let transfer m f = match f with 
-        Primdecl(ty,na) -> StringMap.add na ty m
-      | Strudecl(str,na) -> StringMap.add na Struct m in
-        List.fold_left transfer StringMap.empty (func.formals) 
+      let (symb, sttmap) = 
+        let transfer (m,s) f = match f with 
+        Primdecl(ty,na) -> (StringMap.add na ty m, s)
+      | Strudecl(str,na) -> let sttyp = SStruct(str) in (StringMap.add na sttyp m, StringMap.add na str s)
+        in
+        List.fold_left transfer (StringMap.empty, StringMap.empty) (func.formals) 
       in
-      build_map symb StringMap.empty StringMap.empty (Block func.body)
+      build_map symb StringMap.empty sttmap (Block func.body)
     in
+
 
     (* Return a variable from our local symbol table *)
     let type_of_identifier s =
@@ -247,11 +249,10 @@ let check(functions, structures)=
           let err = "illegal assignment " ^ string_of_datatyp lt ^ " = " ^ 
             string_of_datatyp rt ^ " in " ^ string_of_expr e
           in (match lt,rt,var,e with
-             Struct,Struct,Var(a),Var(b) -> let lstn = type_of_struct a in 
-                let rstn = type_of_struct b in 
-                if lstn = rstn then (Struct, SAssign((lt, s), (rt, e')))
-                else raise (Failure ("illegal assignment " ^ lstn ^ " = " ^ rstn ^ " in " ^ string_of_expr e))
-           | _ ->(check_assign lt rt err, SAssign((lt, s), (rt, e'))))
+             SStruct(a1),SStruct(b1),Var(a),Var(b) -> 
+                   if a1 = b1 then (SStruct(a1), SAssign((lt, s), (rt, e')))
+                   else raise (Failure ("illegal assignment " ^ a1 ^ " = " ^ b1 ^ " in " ^ string_of_expr e))
+           | _ -> (check_assign lt rt err, SAssign((lt, s), (rt, e'))))
       | Uop(op, e) as ex -> 
           let (t, e') = expr e in
           let err = "illegal unary operator " ^ string_of_uniop op ^ string_of_datatyp t ^ " in " ^ string_of_expr ex in
@@ -330,9 +331,8 @@ let check(functions, structures)=
             let err = "illegal argument found " ^ string_of_datatyp et ^ " in " ^ string_of_expr e
             in match ff with 
                 Primdecl(styp,_) -> (check_assign styp et err, e')
-              | Strudecl(strty,_) -> (match e with 
-                                        Var(ve) -> let stn = type_of_struct ve in 
-                                        if stn = strty then (Struct, e')
+              | Strudecl(strty,_) -> (match et with 
+                                        SStruct(stn) -> if stn = strty then (SStruct(stn), e')
                                         else raise (Failure ("inconsistent type of struct " ^ strty ^ " and " ^ stn ^ " in " ^ string_of_expr e))
                                       | _ -> raise (Failure ("illegeal type of struct ")))
           in 
@@ -366,7 +366,7 @@ let check(functions, structures)=
          Matrix, SMatrix(a,b) -> SInitial(t', v, (t', e'))
       | _ ->
       if t' = t || e = Empty then match t with 
-        Struct | Void  -> raise ( Failure (string_of_datatyp t ^ " cannot be initialed this way!"))
+        SStruct(_) | Void  -> raise ( Failure (string_of_datatyp t ^ " cannot be initialed this way!"))
       | _ -> SInitial(t, v, (t', e'))
       else raise ( Failure err))
 
@@ -401,6 +401,7 @@ let check(functions, structures)=
         sformals = func.formals;
         slocals = List.map (fun (v,ty) -> Primdecl(ty,v)) (StringMap.bindings symbols);
         smatsiz = StringMap.bindings matrixsize;
+        strlist = StringMap.bindings strmap;
         sbody = match check_stmt (Block func.body) with
         SBlock(sl) -> sl
         | _ -> raise (Failure ("internal error: block didn't become a block?"))

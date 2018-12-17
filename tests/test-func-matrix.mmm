@@ -5,5 +5,5 @@ func int main() {
     return 0;
 }
 func float f(matrix m){
-    return m[1][2];
+    return m[1][1];
 }

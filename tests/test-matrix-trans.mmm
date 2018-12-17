@@ -2,7 +2,7 @@ func int main()
 {
     matrix m = [1.1,2.2,3.3;4.4,5.5,6.6];
     matrix a[3,2];
-    a = inv(m);
+    a = trans(m);
     printFloat(a[2][0]);
     return 0;    
 }
