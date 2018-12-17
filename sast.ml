@@ -41,6 +41,7 @@ type sfunc_decl = {
     sformals : bind list;
     slocals : bind list;
     smatsiz: (string * (int * int)) list;
+    strlist: (string * string) list;
     sbody : sstmt list;
   }
 

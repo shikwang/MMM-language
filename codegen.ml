@@ -7,6 +7,19 @@ module StringMap = Map.Make(String)
 
 (* translate : Sast.program -> Llvm.module *)
 let translate (functions, structs) =
+  let idx_check = {
+          sftyp = Void;
+          sfname = "index_check";
+          sformals = [Primdecl(Int,"i");Primdecl(Int,"r")];
+          slocals = [];
+          smatsiz = [];
+          strlist =[];
+          sbody = [SIf((Boolean, SBinop ((Int, SVar "i"), Less, (Int, SIntlit 0))), SBlock([SExpr (Void, SCall("abort",[]))]), SBlock([]));
+          SIf((Boolean, SBinop ((Int, SVar "i"), Geq, (Int, SVar "r"))), SBlock([SExpr (Void, SCall("abort",[]))]), SBlock([]))]
+  } 
+  in
+  let functions = idx_check::functions in
+
   let context    = L.global_context () in
 
   (* Create the LLVM compilation module into which we will generate code *)
@@ -45,6 +58,9 @@ let translate (functions, structs) =
   let printf_t : L.lltype = L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
   let printf_func : L.llvalue = L.declare_function "printf" printf_t the_module in
 
+  (* use to interrupt the function flow and throw run-time exception *)
+  let abort_func = L.declare_function "abort" (L.function_type void_t [||]) the_module in
+
   let open_t = L.var_arg_function_type i32_t [| L.pointer_type i8_t;i32_t |] in
   let open_func = L.declare_function "open" open_t the_module in
 
@@ -67,19 +83,36 @@ let translate (functions, structs) =
   let getHeight_func = L.declare_function "height" getHeight_t the_module in 
   *)
 
-  (* Define each function (arguments and return type) so we can 
-    call it even before we've created its body *)
-  let function_decls : (L.llvalue * sfunc_decl) StringMap.t =
-    let function_decl m fdecl =
-      let name = fdecl.sfname
-          and formal_types = Array.of_list(List.map (fun (t,_) -> ltype_of_typ t) 
+  let struct_decls : (L.lltype * sstruc_decl) StringMap.t = 
+    let struct_decl m sdecl = 
+      let struc_name = sdecl.sstname 
+          and mem_types = Array.of_list(List.map (fun (t,_) -> ltype_of_typ t) 
           (List.map (fun c -> match c with 
             Primdecl(a,b) -> (a,b)
-          | Strudecl(a,b) -> (Struct,b)) fdecl.sformals) 
-          )
-      in let ftype = L.function_type (ltype_of_typ fdecl.sftyp) formal_types in
-      StringMap.add name (L.define_function name ftype the_module, fdecl) m in
-    List.fold_left function_decl StringMap.empty functions in
+          | _ -> raise (Failure "Struct cannot have struct member!")) sdecl.sstvar))
+      in let stype = L.named_struct_type context struc_name in 
+      ignore(L.struct_set_body stype mem_types false);
+      StringMap.add struc_name (stype, sdecl) m in
+    List.fold_left struct_decl StringMap.empty structs in
+
+  (* Define each function (arguments and return type) so we can 
+    call it even before we've created its body *)
+    let function_decls : (L.llvalue * sfunc_decl) StringMap.t =
+      let function_decl m fdecl =
+        let name = fdecl.sfname
+        and formal_types = 
+            let formal_list = List.map (fun c -> match c with 
+            Primdecl(a,b) -> (a,b)
+          | Strudecl(a,b) -> (SStruct(a),b)) fdecl.sformals 
+            in let typ_trans (t,v) = match t with
+                SStruct(stn) -> let (sdef,_) = StringMap.find stn struct_decls in
+                                pointer_t sdef
+              | _ -> ltype_of_typ t
+            in
+            Array.of_list (List.map typ_trans formal_list)
+        in let ftype = L.function_type (ltype_of_typ fdecl.sftyp) formal_types in
+        StringMap.add name (L.define_function name ftype the_module, fdecl) m in
+      List.fold_left function_decl StringMap.empty functions in
 
   (* Fill in the body of the given function *)
   let build_function_body fdecl =
@@ -96,31 +129,43 @@ let translate (functions, structs) =
     let local_vars =
       let add_formal m (t, n) p = 
         L.set_value_name n p;
-	    let local = L.build_alloca (ltype_of_typ t) n builder in
-        ignore (L.build_store p local builder);
+	      let local = match t with 
+                    SStruct(stn) -> let (sdef,_) = StringMap.find stn struct_decls in
+                                  L.build_malloc sdef n builder 
+                  | _ -> L.build_alloca (ltype_of_typ t) n builder  
+        in
+      ignore (L.build_store p local builder);
 	    StringMap.add n local m 
 
       (* Allocate space for any locally declared variables and add the
       * resulting registers to our map *)
-      and add_local m (t, n) =
-      let local_var = L.build_alloca (ltype_of_typ t) n builder
-        in StringMap.add n local_var m 
+      and add_local m (t, n) = 
+          let local_var = match t with 
+              SStruct(stn) -> let (sdef,_) = StringMap.find stn struct_decls in
+                              L.build_malloc sdef n builder 
+            | _ -> L.build_alloca (ltype_of_typ t) n builder 
+          in StringMap.add n local_var m 
       in
       let formal_list = List.map (fun c -> match c with 
                                               Primdecl(a,b) -> (a,b)
-                                            | Strudecl(a,b) -> (Struct,b)) fdecl.sformals
+                                            | Strudecl(a,b) -> (SStruct(a),b)) fdecl.sformals
       in
       let formals = List.fold_left2 add_formal StringMap.empty formal_list
                     (Array.to_list (L.params the_function)) 
       in List.fold_left add_local formals (List.filter (fun s -> not (List.mem s formal_list))
                     (List.map (fun c -> match c with 
                       Primdecl(a,b) -> (a,b)
-                      | Strudecl(a,b) -> (Struct,b))  fdecl.slocals))
+                    | Strudecl(a,b) -> (SStruct(a),b))  fdecl.slocals))
     in
 
     (* Return the value for a variable or formal argument.
        Check local names first, then global names *)
     let lookup n = StringMap.find n local_vars 
+    in
+
+    let stru_name =
+      List.fold_left (fun tmp c -> match c with
+      | (v,stn) -> StringMap.add v stn tmp) StringMap.empty fdecl.strlist
     in
 
     let mat_sizes =
@@ -254,9 +299,10 @@ let translate (functions, structs) =
           let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
           let r = L.build_load (L.build_struct_gep ptr 1 "m_r" builder) "r_mat" builder in
           let c = L.build_load (L.build_struct_gep ptr 2 "m_c" builder) "c_mat" builder in
-
-          (*L.build_load (build_matrix_access (mat r c e1' e2' builder) "element_ptr" builder)*)
           let index = L.build_add e2' (L.build_mul e1' c "tmp" builder) "index" builder in
+          let (fdef, _) = StringMap.find "index_check" function_decls in
+          ignore(L.build_call fdef [| e1'; r |] "" builder);
+          ignore(L.build_call fdef [| e2'; c |] "" builder);
           L.build_gep mat [|index|] "element_ptr_ptr" builder
         in
         L.build_load idx "element_ptr" builder
@@ -359,6 +405,16 @@ let translate (functions, structs) =
         (match (is_matrix ptr) with
           | true -> ptr
           | false -> (L.build_load (ptr) s builder))*)
+
+      | SStruaccess(vname, member) -> let stn = StringMap.find vname stru_name in
+        let (sdef,sdecl) = StringMap.find stn struct_decls in
+        let mem_idx = 
+          let rec find_idx m mlist = match mlist with
+              [] -> raise (Failure ("unrecognized struct member " ^ m))
+            | Primdecl(_, nm) :: tl -> if m = nm then 0 else 1 + find_idx m tl
+          in find_idx member sdecl.sstvar
+        in L.build_struct_gep (lookup vname) mem_idx (vname ^ member) builder
+
       | SAssign (s, e) -> 
         let e' = expr builder e in 
           (match s with 
@@ -440,6 +496,10 @@ let translate (functions, structs) =
       | SCall ("printFloat",[e]) ->
         L.build_call printf_func [| float_format_str ; (expr builder e) |]
         "printf" builder
+
+      | SCall("abort",[]) -> 
+        ignore(L.build_call printf_func [| string_format_str ; L.build_global_stringptr "Error: Matrix index out of bound" "tmp" builder|] "printf" builder);
+        L.build_call abort_func [| |] "" builder
 
       | SCall ("open", ([ e ; e2 ])) ->
               (L.build_call open_func [| expr builder e;expr builder e2|] "open" builder)
@@ -625,6 +685,11 @@ let translate (functions, structs) =
                                       | _ -> let e' = expr builder e in
                                              (ignore(L.build_store e' (lookup name) builder); builder))
       | SDefaultmat (name, r, c) -> (L.build_store (build_default_mat (r,c) builder) (lookup name) builder);builder
+      | SIniStrucct (var, strucname, mems) -> 
+        let llmems = List.rev (List.map (expr builder) (List.rev mems)) in
+        let build_struct i llmem = 
+          ignore(L.build_store llmem (L.build_struct_gep (lookup var) i (var ^ "_" ^string_of_int i) builder) builder); i+1
+        in ignore(List.fold_left build_struct 0 llmems); builder
     in
 
     (* Build the code for each statement in the function *)

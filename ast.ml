@@ -3,7 +3,7 @@ type biop = Add | Sub | Mult | Div | Eq | Neq | Less | Leq | Greater | Geq | And
 (*elemult is matrix between int*)
 type uniop = Not | Nega
 
-type datatyp = Int | Float | Boolean | Matrix | String | Void | Struct | SMatrix of int * int
+type datatyp = Int | Float | Boolean | Matrix | String | Void | Struct | SMatrix of int * int | SStruct of string
 
 type bind = Primdecl of datatyp * string
   | Strudecl of string * string
