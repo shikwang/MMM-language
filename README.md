@@ -10,12 +10,23 @@ brew install glog
 
 
 io.cpp is for external openCV library
+
+
 io_compile.sh is to compile with io.cpp
 
 
+
 To test image read:
+
+
 make clean
+
+
 make
+
+
 ./io_compile.sh ioTest.mmm
+
+
 ./main
 

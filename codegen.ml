@@ -508,7 +508,6 @@ let translate (functions, structs) =
       details are in io.cpp *)
       | SCall ("imread", [s;e]) ->
 
-
         let path = expr builder s in
         let (r,c) = lookup_size e in
         let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
@@ -520,7 +519,32 @@ let translate (functions, structs) =
           let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
           let ele = L.build_load res_ptr_ptr "res_ptr" builder in
           ignore(L.build_store ele m_ele_ptr_ptr builder)
+        done); res 
+
+
+      (*| SCall ("imread", [s;e]) ->
+        
+        let path = expr builder s in
+        let str_ptr = match e with (_,e') -> L.build_load (lookup e') e' builder in
+        let mat1_ptr = L.build_load (L.build_struct_gep str_ptr 0 "m_mat1" builder) (vname ^ 0) builder in
+        let mat2_ptr = L.build_load (L.build_struct_gep str_ptr 1 "m_mat2" builder) (vname ^ 0) builder in
+        let mat3_ptr = L.build_load (L.build_struct_gep str_ptr 2 "m_mat3" builder) (vname ^ 0) builder in
+
+        let mat1 = L.build_load (L.build_struct_gep (expr builder  mat1_ptr) 0 "m_mat" builder) "mat_mat" builder in
+        let mat2 = L.build_load (L.build_struct_gep (expr builder  mat2_ptr) 0 "m_mat" builder) "mat_mat" builder in
+        let mat3 = L.build_load (L.build_struct_gep (expr builder  mat3_ptr) 0 "m_mat" builder) "mat_mat" builder in
+        let (r,c) = lookup_size mat1 in
+
+        let res = L.build_call load_cpp_func [| path |] "res_arr" builder in
+        (for i=0 to r*c-1 do
+
+          let m_ele_ptr_ptr = L.build_gep mat1 [|L.const_int i32_t i|] "element_ptr_ptr" builder in
+          let m_ele_ptr = L.build_load m_ele_ptr_ptr "element_ptr" builder in
+          let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
+          let ele = L.build_load res_ptr_ptr "res_ptr" builder in
+          ignore(L.build_store ele m_ele_ptr_ptr builder)
         done); res
+        *)
 
       | SCall ("imwrite", [s;e]) ->
         let path = expr builder s in
