@@ -5,20 +5,19 @@
 download openCV
 https://medium.com/@jaskaranvirdi/setting-up-opencv-and-c-development-environment-in-xcode-b6027728003
 
-if error:
+if error
+```
 brew install glog
+```
 
 
-io.cpp is for external openCV library
 
-
+io.cpp is for external openCV library;
 io_compile.sh is to compile with io.cpp
 
 
-
-To test image read:
-
-
+To test image read
+```
 make clean
 
 
@@ -29,4 +28,5 @@ make
 
 
 ./main
+```
 
