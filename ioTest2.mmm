@@ -10,7 +10,7 @@ func int main(){
     struct img1 = Image(sR,sG,sB);
     imread("sampleimages/bb.jpg",img1,100,100);
 
-    imwrite("sampleimages/res.jpg",img1);
+    imwrite("sampleimages/res1.jpg",img1);
 
     return 0;
 }

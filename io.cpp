@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <string>
+#include <cmath>
 
 using namespace cv;
 
@@ -92,5 +93,29 @@ extern "C" void save_cpp(char fileName[],double* mat1,double* mat2,double* mat3,
     imwrite(fileName,image);
     cout << "output width: " << width << endl;
     cout << "output height: " << height << endl;
+    return;
+}
+
+extern "C" void filter_cpp (double* kernel_d, char inputName[],char outputName[],int d)
+{
+    Mat dst;
+    int ddepth = -1;
+    double delta = 0.0;
+    Point anchor = Point( -1, -1);
+
+    Mat image = imread(inputName,CV_LOAD_IMAGE_COLOR);
+
+    double k[d][d];
+    for(int i=0;i<d;++i){
+        for(int j=0;j<d;++j){
+            k[i][j] = kernel_d[i*d+j];
+        }
+    }
+
+    Mat kernel = Mat(d,d,CV_64F,k);
+
+    filter2D(image, dst, ddepth , kernel, anchor, delta, BORDER_DEFAULT);
+    imwrite(outputName,dst);
+    
     return;
 }

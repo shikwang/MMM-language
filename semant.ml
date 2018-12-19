@@ -89,6 +89,12 @@ let check(functions, structures)=
         formals = [Primdecl(String,"x"); Strudecl("Image","y")];
         body = [];
       });
+      ("cov_openCV",{
+        ftyp = Void;
+        fname = "cov_openCV";
+        formals = [Primdecl(Matrix,"y");Primdecl(String,"z");Primdecl(String,"x");Primdecl(Int,"x1")];
+        body = [];
+      });
       ("cov", {
       ftyp = Matrix;
       fname = "cov";
