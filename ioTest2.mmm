@@ -9,7 +9,6 @@ func int main(){
     matrix sB[100,100];
     struct img1 = Image(sR,sG,sB);
     imread("sampleimages/bb.jpg",img1,100,100);
-    //matrix k = [0.111,0.111,0.111;0.111,0.111,0.111;0.111,0.111,0.111];
 
     imwrite("sampleimages/res.jpg",img1);
 

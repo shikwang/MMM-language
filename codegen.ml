@@ -67,7 +67,7 @@ let translate (functions, structs) =
   let load_cpp_func : L.llvalue = L.declare_function "load_cpp" load_cpp_t the_module in
   let save_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type i8_t; L.pointer_type float_t; 
                               L.pointer_type float_t; L.pointer_type float_t; i32_t; i32_t; |] in
-  let save_cpp_func : L.llvalue = L.declare_function "res" save_cpp_t the_module in
+  let save_cpp_func : L.llvalue = L.declare_function "save_cpp" save_cpp_t the_module in
 
   (*
   let getHeight_t : L.function_type i32_t [| matrix_t |] in
@@ -210,6 +210,18 @@ let translate (functions, structs) =
       | _ -> false
     in
 
+    let mat_float_operation m1 r1 c1 num builder = 
+      let mat1 = L.build_load (L.build_struct_gep m1 0 "m_mat" builder) "mat1" builder in
+      let res_mat = build_default_mat (r1,c1) builder in (* Change the r and c size here *)
+      let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+      (for i = 0 to r1*c1-1 do
+        let m1_ele_ptr_ptr = L.build_gep mat1 [|L.const_int i32_t i|] "element_ptr_ptr" builder in
+        let m1_ele_ptr = L.build_load m1_ele_ptr_ptr "element_ptr" builder in
+        let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
+        let tmp_ele = L.build_fmul m1_ele_ptr num "tmp_ele" builder in ignore(L.build_store tmp_ele res_ptr_ptr builder)
+      done); res_mat
+    in
+        
     let mat_mat_operation m1 m2 r1 c1 r2 c2 op if_elewise builder =
       match if_elewise with 
       | "yes" ->        
@@ -423,6 +435,20 @@ let translate (functions, structs) =
                 in let str_ptr = L.build_load (lookup vname) vname builder
                 in L.build_struct_gep str_ptr mem_idx (stn ^ member) builder
                 in ignore(L.build_store e' mem_ptr builder); e'
+            | (_,SMataccess (s,e1,e2)) ->
+                 let idx = 
+                   let e1' = expr builder e1 and e2' = expr builder e2 in
+                   let ptr = L.build_load (lookup s) s builder in
+                   let mat = L.build_load (L.build_struct_gep ptr 0 "m_mat" builder) "mat" builder in
+                   let r = L.build_load (L.build_struct_gep ptr 1 "m_r" builder) "r_mat" builder in
+                   let c = L.build_load (L.build_struct_gep ptr 2 "m_c" builder) "c_mat" builder in
+                   let index = L.build_add e2' (L.build_mul e1' c "tmp" builder) "index" builder in
+                   let (fdef, _) = StringMap.find "index_check" function_decls in
+                   ignore(L.build_call fdef [| e1'; r |] "" builder);
+                   ignore(L.build_call fdef [| e2'; c |] "" builder);
+                   L.build_gep mat [|index|] "element_ptr_ptr" builder
+                  in
+                  ignore(L.build_store e' idx builder); e'                 
             | _ -> raise (Failure "Assign Failiure!"))
 
       | SBinop (e1, op, e2) ->
@@ -468,6 +494,18 @@ let translate (functions, structs) =
               | A.Greater -> L.build_icmp L.Icmp.Sgt
               | A.Geq     -> L.build_icmp L.Icmp.Sge
               ) e1' e2' "tmp" builder)
+        | (true, false) ->
+           let (r1,c1) = lookup_size e1 in
+           let e1' = expr builder e1 and e2' = expr builder e2 in
+           (match op with
+            | A.Mult -> mat_float_operation e1' r1 c1 e2' builder
+            | A.Div -> mat_float_operation e1' r1 c1 (L.build_fdiv (L.const_float float_t 1.0) e2' "tmp" builder) builder
+           )
+        | (false, true) ->
+           let (r2,c2) = lookup_size e2 in
+           let e1' = expr builder e1 and e2' = expr builder e2 in
+           (match op with
+            | A.Mult -> mat_float_operation e2' r2 c2 e1' builder)
         | (true,true) ->
           let (r1,c1) = lookup_size e1 in
           let (r2,c2) = lookup_size e2 in
