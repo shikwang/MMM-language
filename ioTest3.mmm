@@ -1,0 +1,25 @@
+struct Image {
+    matrix R;matrix G;matrix B
+}
+
+func int main(){
+
+    matrix sR[100,100];
+    matrix sG[100,100];
+    matrix sB[100,100];
+    struct img1 = Image(sR,sG,sB);
+    imread("sampleimages/c.png",img1,100,100);
+    matrix k = [0.111,0.111,0.111;0.111,0.111,0.111;0.111,0.111,0.111];
+
+    matrix newR[100,100];
+    matrix newG[100,100];
+    matrix newB[100,100];
+
+    newR = cov(sR,k);
+    newG = cov(sG,k);
+    newB = cov(sB,k);
+    struct img2 = Image(newR,newG,newB);
+
+    imwrite("sampleimages/res1.jpg",img2);
+    return 0;
+}

@@ -42,51 +42,55 @@ extern "C" double* load_cpp(char imageName[])
     }
     
     // cout.precision(17);
+    /*
     cout << "input height: " << fixed << output[0] << endl;
     cout << "input width: " << fixed << output[1] << endl;
 
+    cout << "first: " << fixed << output[2] << endl;
+    cout << "first: " << fixed << output[3] << endl;
+    cout << "first: " << fixed << output[4] << endl;
+
+    cout << "s: " << fixed << output[5] << endl;
+    cout << "s: " << fixed << output[6] << endl;
+    cout << "s: " << fixed << output[7] << endl;
+
+    cout << "t: " << fixed << output[8] << endl;
+    cout << "t: " << fixed << output[9] << endl;
+    cout << "t: " << fixed << output[10] << endl;*/
     return output;
 }
 
-extern "C" void save_cpp(double* input, char fileName[]) 
+extern "C" void save_cpp(char fileName[],double* mat1,double* mat2,double* mat3,int r, int c) 
 {
-    int height = (int)input[0];
-    int width = (int)input[1];
+    int height = r;
+    int width = c;
     double* data = new double[3*width*height];
-    for(int i = 0; i < 3*width*height; i++) data[i]=input[i+2];
+
+    int ind = 0;
+    int i = 0;
+    while(i<=3*width*height){
+        data[i]=mat1[ind];
+        data[i+1]=mat2[ind];
+        data[i+2]=mat3[ind];
+        i=i+3;
+        ind++;
+    }
+
+    cout << "f" <<data[0] <<endl;
+    cout << "f" <<data[1] <<endl;
+    cout << "f" <<data[2] <<endl;
+
+    cout << "f" <<data[3] <<endl;
+    cout << "f" <<data[4] <<endl;
+    cout << "f" <<data[5] <<endl;
+
+    cout << "f" <<data[6] <<endl;
+    cout << "f" <<data[7] <<endl;
+    cout << "f" <<data[8] <<endl;
+
     Mat image = cv::Mat(height, width, CV_64FC3, data);
     imwrite(fileName,image);
     cout << "output width: " << width << endl;
     cout << "output height: " << height << endl;
     return;
 }
-
-
-// int main()
-// {
-//     Mat img = imread("/Users/weimansun/Documents/1.jpg",CV_LOAD_IMAGE_COLOR);
-//     unsigned char* input = (unsigned char*)(img.data);
-//     double* output = new double[2+3*img.rows*img.cols];
-//     output[0]=img.cols;//width
-//     output[1]=img.rows;//height
-//     double r,g,b;
-//     int k = 2;
-//     for(int i = 0;i < img.rows;i++){
-//         for(int j = 0;j < img.cols;j++){
-//             b = input[img.step * i + j*img.channels()] ;
-//             output[k++]=b;
-//             g = input[img.step * i + j*img.channels() + 1];
-//             output[k++]=g;
-//             r = input[img.step * i + j*img.channels() + 2];
-//             output[k++]=r;
-//         }
-//     }
-//     int width = output[0];
-//     int height = output[1];
-//     double* data = new double[3*width*height];
-//     for(int i = 0; i < 3*width*height; i++) data[i]=output[i+2];
-//     Mat image = cv::Mat(height, width, CV_64FC3, data);
-//     imwrite("/Users/weimansun/Documents/result.jpg",image);
-// 	return 0;
-// }
-

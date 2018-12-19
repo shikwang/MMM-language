@@ -65,8 +65,9 @@ let translate (functions, structs) =
 
   let load_cpp_t : L.lltype = L.function_type (L.pointer_type float_t) [| L.pointer_type i8_t |] in
   let load_cpp_func : L.llvalue = L.declare_function "load_cpp" load_cpp_t the_module in
-  let save_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type i8_t |] in
-  let save_cpp_func : L.llvalue = L.declare_function "save_cpp" save_cpp_t the_module in
+  let save_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type i8_t; L.pointer_type float_t; 
+                              L.pointer_type float_t; L.pointer_type float_t; i32_t; i32_t; |] in
+  let save_cpp_func : L.llvalue = L.declare_function "res" save_cpp_t the_module in
 
   (*
   let getHeight_t : L.function_type i32_t [| matrix_t |] in
@@ -506,71 +507,55 @@ let translate (functions, structs) =
       res[1] should be read as #cols
       and need to assign value one by one to 3 matrix in the struct
       details are in io.cpp *)
-      | SCall ("imread", [s;e]) ->
 
+      | SCall ("imread", [s;e;e2;e3]) ->
         let path = expr builder s in
-        let (r,c) = lookup_size e in
-        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
+        let str_ptr = expr builder e in
+        let r = match e2 with (_,SIntlit(r)) -> r in
+        let c = match e3 with (_,SIntlit(c)) -> c in
+      
+        let mat1_ptr = L.build_load (L.build_struct_gep str_ptr 0 ("R") builder) ("sR") builder in
+        let mat2_ptr = L.build_load (L.build_struct_gep str_ptr 1 ("G") builder) ("sG") builder in
+        let mat3_ptr = L.build_load (L.build_struct_gep str_ptr 2 ("B") builder) ("sB") builder in
+        let mat1 = L.build_load (L.build_struct_gep (mat1_ptr) 0 "m_mat" builder) "mat_mat" builder in
+        let mat2 = L.build_load (L.build_struct_gep (mat2_ptr) 0 "m_mat" builder) "mat_mat" builder in
+        let mat3 = L.build_load (L.build_struct_gep (mat3_ptr) 0 "m_mat" builder) "mat_mat" builder in
         let res = L.build_call load_cpp_func [| path |] "res_arr" builder in
-        (for i=0 to r*c-1 do
 
-          let m_ele_ptr_ptr = L.build_gep mat [|L.const_int i32_t i|] "element_ptr_ptr" builder in
-          let m_ele_ptr = L.build_load m_ele_ptr_ptr "element_ptr" builder in
-          let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
-          let ele = L.build_load res_ptr_ptr "res_ptr" builder in
-          ignore(L.build_store ele m_ele_ptr_ptr builder)
-        done); res 
-
-
-      (*| SCall ("imread", [s;e]) ->
-        
-        let path = expr builder s in
-        let str_ptr = match e with (_,e') -> L.build_load (lookup e') e' builder in
-        let mat1_ptr = L.build_load (L.build_struct_gep str_ptr 0 "m_mat1" builder) (vname ^ 0) builder in
-        let mat2_ptr = L.build_load (L.build_struct_gep str_ptr 1 "m_mat2" builder) (vname ^ 0) builder in
-        let mat3_ptr = L.build_load (L.build_struct_gep str_ptr 2 "m_mat3" builder) (vname ^ 0) builder in
-
-        let mat1 = L.build_load (L.build_struct_gep (expr builder  mat1_ptr) 0 "m_mat" builder) "mat_mat" builder in
-        let mat2 = L.build_load (L.build_struct_gep (expr builder  mat2_ptr) 0 "m_mat" builder) "mat_mat" builder in
-        let mat3 = L.build_load (L.build_struct_gep (expr builder  mat3_ptr) 0 "m_mat" builder) "mat_mat" builder in
-        let (r,c) = lookup_size mat1 in
-
-        let res = L.build_call load_cpp_func [| path |] "res_arr" builder in
-        (for i=0 to r*c-1 do
-
-          let m_ele_ptr_ptr = L.build_gep mat1 [|L.const_int i32_t i|] "element_ptr_ptr" builder in
-          let m_ele_ptr = L.build_load m_ele_ptr_ptr "element_ptr" builder in
-          let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
-          let ele = L.build_load res_ptr_ptr "res_ptr" builder in
-          ignore(L.build_store ele m_ele_ptr_ptr builder)
-        done); res
-        *)
+        let i = ref 2 in
+        let ind = ref 0 in
+        (while !i <= (2+3*r*c) do
+          let m_ele_ptr_ptr_1 = L.build_gep mat1 [|L.const_int i32_t (!ind)|] "element_ptr_ptr" builder in
+          let res_ptr_ptr_1 = L.build_gep res [|L.const_int i32_t (!i)|] "res_ptr_ptr" builder in
+          let ele_1 = L.build_load res_ptr_ptr_1 "res_ptr" builder in ignore(L.build_store ele_1 m_ele_ptr_ptr_1 builder);
+          let m_ele_ptr_ptr_2 = L.build_gep mat2 [|L.const_int i32_t (!ind)|] "element_ptr_ptr" builder in
+          let res_ptr_ptr_2 = L.build_gep res [|L.const_int i32_t (!i+1)|] "res_ptr_ptr" builder in
+          let ele_2 = L.build_load res_ptr_ptr_2 "res_ptr" builder in ignore(L.build_store ele_2 m_ele_ptr_ptr_2 builder);
+          let m_ele_ptr_ptr_3 = L.build_gep mat3 [|L.const_int i32_t (!ind)|] "element_ptr_ptr" builder in
+          let res_ptr_ptr_3 = L.build_gep res [|L.const_int i32_t (!i+2)|] "res_ptr_ptr" builder in
+          let ele_3 = L.build_load res_ptr_ptr_3 "res_ptr" builder in ignore(L.build_store ele_3 m_ele_ptr_ptr_3 builder);
+          ind := (!ind+1);
+          i := (!i+3);
+        done);res
 
       | SCall ("imwrite", [s;e]) ->
         let path = expr builder s in
-        let (r,c) = lookup_size e in
-        let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
-        ignore(L.build_call save_cpp_func [| mat; path |] "" builder);mat
+        let str_ptr = expr builder e in
+        let mat1_ptr = L.build_load (L.build_struct_gep str_ptr 0 ("R") builder) ("sR") builder in
+        let mat2_ptr = L.build_load (L.build_struct_gep str_ptr 1 ("G") builder) ("sG") builder in
+        let mat3_ptr = L.build_load (L.build_struct_gep str_ptr 2 ("B") builder) ("sB") builder in
+        let mat1 = L.build_load (L.build_struct_gep (mat1_ptr) 0 "m_mat" builder) "mat_mat" builder in
+        let mat2 = L.build_load (L.build_struct_gep (mat2_ptr) 0 "m_mat" builder) "mat_mat" builder in
+        let mat3 = L.build_load (L.build_struct_gep (mat3_ptr) 0 "m_mat" builder) "mat_mat" builder in
+        let r = L.build_load (L.build_struct_gep (mat1_ptr) 1 "m_mat" builder) "mat_mat" builder in
+        let c = L.build_load (L.build_struct_gep (mat1_ptr) 2 "m_mat" builder) "mat_mat" builder in
+
+        ignore(L.build_call save_cpp_func [| path;mat1;mat2;mat3;r;c |] "" builder);mat1
 
       | SCall("abort",[]) -> 
         ignore(L.build_call printf_func [| string_format_str ; L.build_global_stringptr "Error: Matrix index out of bound" "tmp" builder|] "printf" builder);
         L.build_call abort_func [| |] "" builder
 
-
-      
-
-
-
-
-
-
-
-
-
-
-
-          
-        
       | SCall ("height",[e]) ->
         let r = L.build_load (L.build_struct_gep (expr builder e) 1 "m_r" builder) "r_mat" builder in
         r
@@ -631,7 +616,7 @@ let translate (functions, structs) =
         let res_mat = build_default_mat (r1,c1) builder in
         let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
 
-        let tmp_mat = build_default_mat (r1+2,c1+2) builder in
+        let tmp_mat = build_default_mat (r1+2*d,c1+2*d) builder in
         let tmp = L.build_load (L.build_struct_gep tmp_mat 0 "m_mat" builder) "mat" builder in
 
         (for i=0 to (r1+d) do

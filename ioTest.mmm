@@ -1,12 +1,26 @@
-func int main(){
+struct Image {
+    matrix R;
+    matrix G;
+    matrix B
+}
 
-    //matrix m[251,376];
-    matrix m[2,2];
-    imread("b.jpg",m);
-    printFloat(m[0][0]);
-    printFloat(m[0][1]);
-    printFloat(m[1][0]);
-    printFloat(m[1][1]);
-    imwrite("out.jpg",m);
+func int main(){
+    matrix sR[100,100];
+    matrix sG[100,100];
+    matrix sB[100,100];
+    struct img1 = Image(sR,sG,sB);
+    imread("sampleimages/bb.jpg",img1,100,100);
+
+    printFloat(sR[0][0]);
+    printFloat(sG[0][0]);
+    printFloat(sB[0][0]);
+
+    printFloat(sR[0][1]);
+    printFloat(sG[0][1]);
+    printFloat(sB[0][1]);
+
+    printFloat(sR[0][2]);
+    printFloat(sG[0][2]);
+    printFloat(sB[0][2]);
     return 0;
 }

@@ -80,13 +80,13 @@ let check(functions, structures)=
       ("imread",{
         ftyp = Void;
         fname = "imread";
-        formals = [Primdecl(String,"x"); Primdecl(Matrix,"m")];
+        formals = [Primdecl(String,"x"); Strudecl("Image","y");Primdecl(Int,"x1");Primdecl(Int,"x2")];
         body = [];
       });
       ("imwrite",{
         ftyp = Void;
         fname = "imwrite";
-        formals = [Primdecl(String,"x"); Primdecl(Matrix,"m")];
+        formals = [Primdecl(String,"x"); Strudecl("Image","y")];
         body = [];
       });
       ("cov", {
