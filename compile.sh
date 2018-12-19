@@ -1,1 +1,11 @@
-cat $1 | ./mmm.native > source.llvm; llc source.llvm -o source.s; gcc source.s -o main; rm source.s source.llvm
+#!/bin/bash
+for var in "$@"
+do  
+    ./mmm.native $var >> $var.ir;
+    llc $var.ir;
+    clang++ `pkg-config --cflags opencv` `pkg-config --libs opencv` $var.ir.s io.cpp -o main;
+    rm $var.ir;
+    rm $var.ir.s
+done
+
+    
