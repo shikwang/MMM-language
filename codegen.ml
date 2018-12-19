@@ -63,18 +63,28 @@ let translate (functions, structs) =
   let abort_func = L.declare_function "abort" (L.function_type void_t [||]) the_module in
 
 
-  let load_cpp_t : L.lltype = L.function_type (L.pointer_type float_t) [| L.pointer_type i8_t |] in
+  let load_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type i8_t;L.pointer_type float_t;L.pointer_type float_t;L.pointer_type float_t |] in
   let load_cpp_func : L.llvalue = L.declare_function "load_cpp" load_cpp_t the_module in
+
   let save_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type i8_t; L.pointer_type float_t; 
                               L.pointer_type float_t; L.pointer_type float_t; i32_t; i32_t; |] in
   let save_cpp_func : L.llvalue = L.declare_function "save_cpp" save_cpp_t the_module in
+
   let filter_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type i8_t; L.pointer_type i8_t; i32_t|] in
   let filter_cpp_func : L.llvalue = L.declare_function "filter_cpp" filter_cpp_t the_module in
 
-  (*
-  let getHeight_t : L.function_type i32_t [| matrix_t |] in
-  let getHeight_func = L.declare_function "height" getHeight_t the_module in 
-  *)
+  let iter1mat_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type float_t; float_t; i32_t|] in
+  let iter1mat_cpp_func : L.llvalue = L.declare_function "iter1mat_cpp" iter1mat_cpp_t the_module in
+
+  let trans_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type float_t; i32_t; i32_t|] in
+  let trans_cpp_func : L.llvalue = L.declare_function "trans_cpp" trans_cpp_t the_module in
+
+  let iter2mat_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type float_t; L.pointer_type float_t; i32_t; i32_t|] in
+  let iter2mat_cpp_func : L.llvalue = L.declare_function "iter2mat_cpp" iter2mat_cpp_t the_module in
+
+  let matmul_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type float_t; L.pointer_type float_t; i32_t; i32_t; i32_t; i32_t|] in
+  let matmul_cpp_func : L.llvalue = L.declare_function "matmul_cpp" matmul_cpp_t the_module in
+
 
   let struct_decls : (L.lltype * sstruc_decl) StringMap.t = 
     let struct_decl m sdecl = 
@@ -194,10 +204,10 @@ let translate (functions, structs) =
     let build_default_mat (r,c) builder = 
       let mat = L.build_array_malloc float_t (L.const_int i32_t (r*c)) "system_mat" builder in
       (*try cast pointer*)
-      (for x = 0 to (r*c-1) do
+      (*for x = 0 to (r*c-1) do
         let element_ptr = L.build_gep mat [|(L.const_int i32_t x)|] "element_ptr" builder in 
         ignore(L.build_store (L.const_float float_t 0.0) element_ptr builder)
-      done);
+      done*)
       let m = L.build_malloc matrix_t "m" builder in
       let m_mat = L.build_struct_gep m 0 "m_mat" builder in ignore(L.build_store mat m_mat builder);
       let m_r = L.build_struct_gep m 1 "m_r" builder in ignore(L.build_store (L.const_int i32_t r) m_r builder);
@@ -216,12 +226,13 @@ let translate (functions, structs) =
       let mat1 = L.build_load (L.build_struct_gep m1 0 "m_mat" builder) "mat1" builder in
       let res_mat = build_default_mat (r1,c1) builder in (* Change the r and c size here *)
       let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
-      (for i = 0 to r1*c1-1 do
+      ignore(L.build_call iter1mat_cpp_func [| mat1;res;num;(L.const_int i32_t (r1*c1)) |] "" builder);
+      (*for i = 0 to r1*c1-1 do
         let m1_ele_ptr_ptr = L.build_gep mat1 [|L.const_int i32_t i|] "element_ptr_ptr" builder in
         let m1_ele_ptr = L.build_load m1_ele_ptr_ptr "element_ptr" builder in
         let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
         let tmp_ele = L.build_fmul m1_ele_ptr num "tmp_ele" builder in ignore(L.build_store tmp_ele res_ptr_ptr builder)
-      done); res_mat
+      done*); res_mat
     in
         
     let mat_mat_operation m1 m2 r1 c1 r2 c2 op if_elewise builder =
@@ -231,54 +242,17 @@ let translate (functions, structs) =
         let mat2 = L.build_load (L.build_struct_gep m2 0 "m_mat" builder) "mat2" builder in
         let res_mat = build_default_mat (r1,c1) builder in (* Change the r and c size here *)
         let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
+        ignore(L.build_call iter2mat_cpp_func [| mat1;mat2;res;(L.const_int i32_t op);(L.const_int i32_t (r1*c1)) |] "" builder);
+        res_mat
 
-        (for i = 0 to r1*c1-1 do
-          let m1_ele_ptr_ptr = L.build_gep mat1 [|L.const_int i32_t i|] "element_ptr_ptr" builder in
-          let m1_ele_ptr = L.build_load m1_ele_ptr_ptr "element_ptr" builder in
-
-          let m2_ele_ptr_ptr = L.build_gep mat2 [|L.const_int i32_t i|] "element_ptr_ptr" builder in
-          let m2_ele_ptr = L.build_load m2_ele_ptr_ptr "element_ptr" builder in
-
-          let res_ptr_ptr = L.build_gep res [|L.const_int i32_t i|] "res_ptr_ptr" builder in
-          let res_ptr = L.build_load res_ptr_ptr "res_ptr" builder in
-
-          let tmp_ele = op m1_ele_ptr m2_ele_ptr "tmp_ele" builder in ignore(L.build_store tmp_ele res_ptr_ptr builder)
-        done); res_mat
       | "not" -> 
         let mat1 = L.build_load (L.build_struct_gep m1 0 "m_mat" builder) "mat1" builder in
         let mat2 = L.build_load (L.build_struct_gep m2 0 "m_mat" builder) "mat2" builder in
         let res_mat = build_default_mat (r1,c2) builder in
         let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
-
-        (for i = 0 to r1-1 do
-          (for j = 0 to c2-1 do
-            let idx = (i*c2+j) in
-            let res_ptr_ptr = L.build_gep res [|L.const_int i32_t idx|] "res_ptr_ptr" builder in
-            let res_ptr = L.build_load res_ptr_ptr "res_ptr" builder in
-
-            let tmp_sum = L.build_alloca float_t "tmp_sum" builder in
-
-            let x = ref (i*c1) in
-            let y = ref j in
-            (while !y<(r2*c2) do
-              let m1_ele_ptr_ptr = L.build_gep mat1 [|L.const_int i32_t !x|] "element_ptr_ptr" builder in
-              let m1_ele_ptr = L.build_load m1_ele_ptr_ptr "element_ptr" builder in
-
-              let m2_ele_ptr_ptr = L.build_gep mat2 [|L.const_int i32_t !y|] "element_ptr_ptr" builder in
-              let m2_ele_ptr = L.build_load m2_ele_ptr_ptr "element_ptr" builder in
-              
-              let tmp = L.build_fmul m1_ele_ptr m2_ele_ptr "tmp_ele" builder in
-
-              let new_sum = L.build_fadd (L.build_load tmp_sum "addsum" builder) tmp "new_sum" builder in 
-                ignore(L.build_store new_sum tmp_sum builder);
-              x := (!x+1);
-              y := (!y+c2);
-            done);
-            
-            ignore(L.build_store (L.build_load tmp_sum "tmp" builder) res_ptr_ptr builder);
-          done);
-        done);
+        ignore(L.build_call matmul_cpp_func [| mat1;mat2;res;(L.const_int i32_t r1);(L.const_int i32_t c1);(L.const_int i32_t r2);(L.const_int i32_t c2) |] "" builder);
         res_mat
+ 
     in
 
     (* Construct code for an expression; return its value *)
@@ -288,14 +262,6 @@ let translate (functions, structs) =
       | SFloatlit l -> L.const_float float_t l
       | SStringlit s -> L.build_global_stringptr s "tmp" builder
 
-      (*turn float array into list, then change type to float_t, then back to array
-      | SMatrixlit (f_array,(r,c)) -> 
-        let l = r * c in 
-        let f_array_list = Array.to_list f_array in
-        let f_array_list_ll = List.map(L.const_float float_t) f_array_list in
-        let f_array_list_ll_array = Array.of_list f_array_list_ll in
-        L.const_array (array_t float_t l) f_array_list_ll_array
-      *)
       | SMatrixlit (f_array,(r,c)) -> (build_matrix_lit (f_array,(r,c)) builder)
       | SMataccess (s,e1,e2) ->
         let idx = 
@@ -406,10 +372,6 @@ let translate (functions, structs) =
 
       | SEmpty     -> L.const_int i32_t 0
       | SVar s     -> L.build_load (lookup s) s builder
-       (* let ptr = lookup s in
-        (match (is_matrix ptr) with
-          | true -> ptr
-          | false -> (L.build_load (ptr) s builder))*)
 
       | SStruaccess(vname, member) -> let stn = StringMap.find vname stru_name in
         let (sdef,sdecl) = StringMap.find stn struct_decls in
@@ -513,11 +475,11 @@ let translate (functions, structs) =
           let (r2,c2) = lookup_size e2 in
           let e1' = expr builder e1 and e2' = expr builder e2 in
           (match op with
-              A.Add -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fadd "yes" builder
-            | A.Sub -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fsub "yes" builder
-            | A.Mult -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fmul "not" builder
-            | A.Elemult -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fmul "yes" builder
-            | A.Elediv -> mat_mat_operation e1' e2' r1 c1 r2 c2 L.build_fdiv "yes" builder
+              A.Add -> mat_mat_operation e1' e2' r1 c1 r2 c2 0 "yes" builder
+            | A.Sub -> mat_mat_operation e1' e2' r1 c1 r2 c2 1 "yes" builder
+            | A.Mult -> mat_mat_operation e1' e2' r1 c1 r2 c2 4 "not" builder
+            | A.Elemult -> mat_mat_operation e1' e2' r1 c1 r2 c2 2 "yes" builder
+            | A.Elediv -> mat_mat_operation e1' e2' r1 c1 r2 c2 3 "yes" builder
           )
       )
 
@@ -541,12 +503,6 @@ let translate (functions, structs) =
         L.build_call printf_func [| float_format_str ; (expr builder e) |]
         "printf" builder
 
-      
-      (* can read value from image but not correctly
-      res[0] should be read as #rows
-      res[1] should be read as #cols
-      and need to assign value one by one to 3 matrix in the struct
-      details are in io.cpp *)
 
       | SCall ("imread", [s;e;e2;e3]) ->
         let path = expr builder s in
@@ -560,23 +516,8 @@ let translate (functions, structs) =
         let mat1 = L.build_load (L.build_struct_gep (mat1_ptr) 0 "m_mat" builder) "mat_mat" builder in
         let mat2 = L.build_load (L.build_struct_gep (mat2_ptr) 0 "m_mat" builder) "mat_mat" builder in
         let mat3 = L.build_load (L.build_struct_gep (mat3_ptr) 0 "m_mat" builder) "mat_mat" builder in
-        let res = L.build_call load_cpp_func [| path |] "res_arr" builder in
+        ignore (L.build_call load_cpp_func [| path;mat1;mat2;mat3 |] "" builder );str_ptr
 
-        let i = ref 2 in
-        let ind = ref 0 in
-        (while !i <= (2+3*r*c) do
-          let m_ele_ptr_ptr_1 = L.build_gep mat1 [|L.const_int i32_t (!ind)|] "element_ptr_ptr" builder in
-          let res_ptr_ptr_1 = L.build_gep res [|L.const_int i32_t (!i)|] "res_ptr_ptr" builder in
-          let ele_1 = L.build_load res_ptr_ptr_1 "res_ptr" builder in ignore(L.build_store ele_1 m_ele_ptr_ptr_1 builder);
-          let m_ele_ptr_ptr_2 = L.build_gep mat2 [|L.const_int i32_t (!ind)|] "element_ptr_ptr" builder in
-          let res_ptr_ptr_2 = L.build_gep res [|L.const_int i32_t (!i+1)|] "res_ptr_ptr" builder in
-          let ele_2 = L.build_load res_ptr_ptr_2 "res_ptr" builder in ignore(L.build_store ele_2 m_ele_ptr_ptr_2 builder);
-          let m_ele_ptr_ptr_3 = L.build_gep mat3 [|L.const_int i32_t (!ind)|] "element_ptr_ptr" builder in
-          let res_ptr_ptr_3 = L.build_gep res [|L.const_int i32_t (!i+2)|] "res_ptr_ptr" builder in
-          let ele_3 = L.build_load res_ptr_ptr_3 "res_ptr" builder in ignore(L.build_store ele_3 m_ele_ptr_ptr_3 builder);
-          ind := (!ind+1);
-          i := (!i+3);
-        done);res
 
       | SCall ("imwrite", [s;e]) ->
         let path = expr builder s in
@@ -635,16 +576,7 @@ let translate (functions, structs) =
         let mat = L.build_load (L.build_struct_gep (expr builder e) 0 "m_mat" builder) "mat_mat" builder in
         let res_mat = build_default_mat (c,r) builder in
         let res = L.build_load (L.build_struct_gep res_mat 0 "m_mat" builder) "mat" builder in
-        
-        (for i = 0 to r-1 do
-          (for j = 0 to c-1 do
-            let ele_ptr_ptr = (L.build_gep mat [|L.const_int i32_t (i*c+j)|] "element_ptr_ptr" builder) in
-            let ele = L.build_load ele_ptr_ptr "element_ptr" builder in
-
-            let res_ptr_ptr = L.build_gep res [|L.const_int i32_t (j*r+i)|] "res_ptr_ptr" builder in
-            ignore(L.build_store ele res_ptr_ptr builder)
-          done);
-        done);
+        ignore (L.build_call trans_cpp_func [| mat;res;(L.const_int i32_t r);(L.const_int i32_t c) |] "" builder );
         res_mat
       
       | SCall ("cov_openCV", [k;e1;e2;sd]) ->

@@ -22,23 +22,21 @@
 using namespace cv;
 
 using namespace std;
-extern "C" double* load_cpp(char imageName[])
+extern "C" void load_cpp(char imageName[],double* mat1,double* mat2,double* mat3)
 {
     Mat img = imread(imageName,CV_LOAD_IMAGE_COLOR);
     unsigned char* input = (unsigned char*)(img.data);
-    double* output = new double[2+3*img.rows*img.cols];
-    output[0]=img.rows;
-    output[1]=img.cols;
     double r,g,b;
-    int k = 2;
     for(int i = 0;i < img.rows;i++){
         for(int j = 0;j < img.cols;j++){
-            b = input[img.step * i + j*img.channels()] ;
-            output[k++]=b;
-            g = input[img.step * i + j*img.channels() + 1];
-            output[k++]=g;
-            r = input[img.step * i + j*img.channels() + 2];
-            output[k++]=r;
+            int k = img.step * i + j*img.channels();
+            int s = i*img.cols + j;
+            b = input[k] ;
+            mat1[s]=b;
+            g = input[k + 1];
+            mat2[s]=g;
+            r = input[k + 2];
+            mat3[s]=r;
         }
     }
     
@@ -58,7 +56,7 @@ extern "C" double* load_cpp(char imageName[])
     cout << "t: " << fixed << output[8] << endl;
     cout << "t: " << fixed << output[9] << endl;
     cout << "t: " << fixed << output[10] << endl;*/
-    return output;
+    return;
 }
 
 extern "C" void save_cpp(char fileName[],double* mat1,double* mat2,double* mat3,int r, int c) 
@@ -117,5 +115,69 @@ extern "C" void filter_cpp (double* kernel_d, char inputName[],char outputName[]
     filter2D(image, dst, ddepth , kernel, anchor, delta, BORDER_DEFAULT);
     imwrite(outputName,dst);
     
+    return;
+}
+
+extern "C" void iter1mat_cpp (double* indata, double* outdata, double k, int len)
+{
+    for(int i=0;i<len;++i){
+        outdata[i] = indata[i]*k;
+    }    
+    return;
+}
+
+extern "C" void trans_cpp (double* indata, double* outdata, int r, int c)
+{
+    for(int i=0;i<r;++i){
+        for(int j=0;j<c;++j){
+            outdata[j*r+i] = indata[i*c+j];
+        }
+    }   
+    return;
+}
+
+extern "C" void iter2mat_cpp (double* indata1, double* indata2, double* outdata, int mode, int len)
+{
+    switch (mode){
+        case 0:
+        for(int i=0;i<len;++i){
+            outdata[i] = indata1[i] + indata2[i];
+        }   
+        break;
+        case 1:
+        for(int i=0;i<len;++i){
+            outdata[i] = indata1[i] - indata2[i];
+        } 
+        break;
+        case 2:
+        for(int i=0;i<len;++i){
+            outdata[i] = indata1[i] * indata2[i];
+        } 
+        break;
+        case 3: 
+        for(int i=0;i<len;++i){
+            outdata[i] = indata1[i] / indata2[i];
+        } 
+        break;
+    }  
+    return;
+}
+
+extern "C" void matmul_cpp (double* indata1, double* indata2, double* outdata, int r1, int c1, int r2, int c2)
+{
+    for(int i=0;i<r1;++i){
+        for(int j=0;j<c2;++j){
+            int idx = i*c2+j;
+            float tmp_sum = 0.0;
+            int x = i * c1;
+            int y = j;
+            while (y < r2*c2){
+                tmp_sum += indata1[x]*indata2[y];
+                x = x + 1;
+                y = y + c2;
+            }
+            outdata[idx] = tmp_sum;
+        }
+    }
     return;
 }

@@ -145,14 +145,7 @@ let check(functions, structures)=
       Primdecl(_,n) -> n
     | Strudecl(_,n) -> n) func.formals);
 
-    (*
-    List.iter (check_not_void (fun n -> "illegal void local " ^ n ^
-      " in " ^ func.fname)) func.locals;
-
-    report_duplicate (fun n -> "duplicate local " ^ n ^ " in " ^ func.fname)
-      (List.map snd func.locals);
-    *)
-
+    
     let range_size k a b =  match a,b with
         Beg, End -> k
       | Beg, Ind(s) -> if s <= k then s
