@@ -9,17 +9,21 @@ func int main(){
     matrix sB[100,100];
     struct img1 = Image(sR,sG,sB);
     imread("sampleimages/c.png",img1,100,100);
-    matrix k = [0.111,0.111,0.111;0.111,0.111,0.111;0.111,0.111,0.111];
 
-    matrix newR[100,100];
-    matrix newG[100,100];
-    matrix newB[100,100];
+    matrix grayscale[100,100];
 
-    newR = cov(sR,k);
-    newG = cov(sG,k);
-    newB = cov(sB,k);
-    struct img2 = Image(newR,newG,newB);
+    int i;
+    int j;
 
-    imwrite("sampleimages/res1.jpg",img2);
+    for(i = 0; i < 100; i = i + 1){
+        for(j = 0; j < 100; j = j + 1){
+            float gray = 0.3 * sR[i][j] + 0.59 * sG[i][j] + 0.11 * sB[i][j];
+            grayscale[i][j] = gray;
+        }
+    }
+
+    struct img2 = Image(grayscale,grayscale,grayscale);
+
+    imwrite("sampleimages/c_gray3.jpg",img2);
     return 0;
 }
