@@ -1,0 +1,7 @@
+func int main(){
+
+    matrix kernel = [-1.0,-1.0,-1.0;-1.0,8.0,-1.0;-1.0,-1.0,-1.0];    
+    cov_openCV(kernel,"sampleimages/c.png","sampleimages/c_sedge_v_2.jpg",3);
+    printStr("done");
+    return 0;
+}

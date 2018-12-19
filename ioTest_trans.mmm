@@ -1,0 +1,27 @@
+struct Image {
+    matrix R;matrix G;matrix B
+}
+
+func int main(){
+
+    matrix sR[100,100];
+    matrix sG[100,100];
+    matrix sB[100,100];
+    struct img1 = Image(sR,sG,sB);
+    imread("sampleimages/c.png",img1,100,100);
+
+    matrix Gray[100,100];
+
+    matrix newR[100,100];
+    matrix newG[100,100];
+    matrix newB[100,100];
+
+    newR = trans(sR);
+    newG = trans(sG);
+    newB = trans(sB);
+
+    struct img2 = Image(newR,newG,newB);
+
+    imwrite("sampleimages/c_trans.jpg",img2);
+    return 0;
+}

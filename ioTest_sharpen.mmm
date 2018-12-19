@@ -1,0 +1,13 @@
+func int main(){
+
+    matrix kernel = [0.0,-1.0,0.0;-1.0,5.0,-1.0;0.0,-1.0,0.0];
+
+    
+    cov_openCV(kernel,"sampleimages/c.png","sampleimages/c_sharpen_2.jpg",3);
+    //printFloat(res[0][0]);
+    //printFloat(res[0][1]);
+    //printFloat(res[1][0]);
+    //printFloat(res[1][1]);
+    printStr("done");
+    return 0;
+}
