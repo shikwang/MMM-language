@@ -67,7 +67,9 @@ let translate (functions, structs) =
   let load_cpp_func : L.llvalue = L.declare_function "load_cpp" load_cpp_t the_module in
   let save_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type i8_t; L.pointer_type float_t; 
                               L.pointer_type float_t; L.pointer_type float_t; i32_t; i32_t; |] in
-  let save_cpp_func : L.llvalue = L.declare_function "res" save_cpp_t the_module in
+  let save_cpp_func : L.llvalue = L.declare_function "save_cpp" save_cpp_t the_module in
+  let filter_cpp_t : L.lltype = L.function_type void_t [| L.pointer_type float_t; L.pointer_type i8_t; L.pointer_type i8_t; i32_t|] in
+  let filter_cpp_func : L.llvalue = L.declare_function "filter_cpp" filter_cpp_t the_module in
 
   (*
   let getHeight_t : L.function_type i32_t [| matrix_t |] in
@@ -607,6 +609,14 @@ let translate (functions, structs) =
         done);
         res_mat
       
+      | SCall ("cov_openCV", [k;e1;e2;sd]) ->
+        let fromPath = expr builder e1 in
+        let toPath = expr builder e2 in
+        let d = expr builder sd in
+        let str_ptr = expr builder k in
+        let kernel = L.build_load (L.build_struct_gep (str_ptr) 0 "k_mat" builder) "mat_mat_k" builder in
+        L.build_call filter_cpp_func [| kernel; fromPath; toPath;d |] "" builder 
+
       | SCall ("cov", [e1;e2]) ->
         let (r1,c1) = lookup_size e1 in
         let (r2,c2) = lookup_size e2 in
